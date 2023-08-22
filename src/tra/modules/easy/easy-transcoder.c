@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <tra/easy.h>
 #include <tra/log.h>
+#include <tra/transcoder.h>
 
 /* ------------------------------------------------------- */
 
@@ -44,6 +45,14 @@ struct tra_easy_app_transcoder {
   tra_easy_api* decoder_api;
   //void* decoder_ctx;
   //tra_transcoder_list* transcode_profiles;
+};
+
+struct tra_easy_app_object{
+  tra_transcoder* transcoder_obj;
+  tra_encoder_api* encoder_api;
+  tra_decoder_api* decoder_api;
+  tra_transcoder_settings *cfg;
+  trans_settings* settings;
 };
 
 /* ------------------------------------------------------- */
@@ -96,7 +105,49 @@ static int tra_easy_transcoder_create(tra_easy* ez, tra_easy_app_object** obj) {
 static int tra_easy_transcoder_init(tra_easy* ez, tra_easy_app_object* obj) {
 
   int r = 0;
-  
+
+  if(NULL == obj){
+    TRAE("tra_easy_app_object not initialized");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == obj->transcoder_obj){
+    TRAE("transcoder_obj not initialized");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == obj->settings){
+    TRAE("settings not initialized");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == obj->encoder_api){
+    TRAE("encoder_api not chosen");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == obj->decoder_api){
+    TRAE("decoder_api not chosen");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == obj->cfg){
+    TRAE("transcoder configuration not initialized");
+    r = -10;
+    goto error;
+  }
+
+  r = tra_combinded_transcoder_create(obj->encoder_api, obj->decoder_api, obj->cfg, obj->settings, &obj->transcoder_obj);
+  if(0 > r) {
+    TRAE("failed to initiate easy transcoder");
+    goto error;
+  }
+
  error:
   return r;
 }
@@ -107,6 +158,24 @@ static int tra_easy_transcoder_destroy(tra_easy_app_object* ez) {
 
   int r = 0;
 
+  if(NULL == ez){
+    TRAE("tra_easy_app_object not initialized");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == ez->transcoder_obj){
+    TRAE("transcoder_obj not initialized");
+    r = -10;
+    goto error;
+  }
+
+  r = tra_combinded_transcoder_destroy(ez->transcoder_obj);
+  if(0 > r) {
+    TRAE("failed to destroy easy transcoder");
+    goto error;
+  }
+
  error:
   return r;
 }
@@ -116,6 +185,24 @@ static int tra_easy_transcoder_destroy(tra_easy_app_object* ez) {
 static int tra_easy_transcoder_decode(tra_easy_app_object* ez, uint32_t type, void* data) {
   
   int r = 0;
+
+  if(NULL == ez){
+    TRAE("tra_easy_app_object not initialized");
+    r = -10;
+    goto error;
+  }
+
+  if(NULL == ez->transcoder_obj){
+    TRAE("transcoder_obj not initialized");
+    r = -10;
+    goto error;
+  }
+
+  r = tra_combinded_transcoder_transcode(ez->transcoder_obj, type, data);
+  if(0 > r) {
+    TRAE("failed to transcode using easy transcoder");
+    goto error;
+  }
 
  error:
   return r;

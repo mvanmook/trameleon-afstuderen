@@ -1,3 +1,12 @@
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Copyright 2017 Intel Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");// you may not use this file except
+// in compliance with the License.// You may obtain a copy of the License at//// http://www.apache.org/licenses/LICENSE-2.0
+// //// Unless required by applicable law or agreed to in writing, software// distributed under the
+// License is distributed on an "AS IS" BASIS,// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+// express or implied.// See the License for the specific language governing permissions and// limitations under the License.
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tra/modules/mft/MediaFoundationDecoder.h"
 #include "tra/log.h"
@@ -16,7 +25,6 @@ namespace tra {
   }
 
   int MediaFoundationDecoder::findDecoder(const GUID &input_type, const GUID &output_type) {
-
     HRESULT hr = S_OK;
     int r = 0;
     UINT32 count = 0;
@@ -66,14 +74,14 @@ namespace tra {
     GUID input_format;
     GUID output_format;
 
-    r = convert_trameleon_to_mft_image_format(settings.input_format, input_format);
+    r = convert_trameleon_to_mft_image_format(input_format, settings.input_format);
     if (0 > r) {
       TRAE("can't convert trameleon image format to mft format");
       r = -10;
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings.output_format, output_format);
+    r = convert_trameleon_to_mft_image_format(output_format, settings.output_format);
     if (0 > r) {
       TRAE("can't convert trameleon image format to mft format");
       r = -10;
@@ -152,7 +160,7 @@ namespace tra {
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings.input_format, mf_image_format);
+    r = convert_trameleon_to_mft_image_format(mf_image_format, settings.input_format);
     if (0 > r) {
       TRAE("Failed to convert image format to mft.\n");
       r = -10;
@@ -225,7 +233,7 @@ namespace tra {
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings.output_format,mf_image_format);
+    r = convert_trameleon_to_mft_image_format(mf_image_format, settings.output_format);
     if (0 > r) {
       TRAE("Failed to convert image format to mft.\n");
       r = -10;

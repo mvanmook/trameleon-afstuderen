@@ -169,7 +169,7 @@ static int log_message_stdout(
     time_str,
     sizeof(time_str),
     "%Y-%m-%d %H:%M:%S",
-    &time_size
+    (uint32_t*)&time_size
   );
 
   if (r < 0) {

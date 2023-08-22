@@ -1,5 +1,7 @@
 /* ------------------------------------------------------- */
 
+#include <tra/transcoder.h>
+#include "tra/transcoder.h"
 #include <stdlib.h>
 #include <tra/log.h>
 #include <tra/core.h>
@@ -181,7 +183,70 @@ int tra_core_decoder_create(
     TRAE("Failed to create a encoder instance for `%s`.", name);
     return -6;
   }
-  
+
+  return r;
+}
+
+/* ------------------------------------------------------- */
+
+TRA_LIB_DLL int tra_core_transcoder_create(tra_core* ctx, const char* decoder_name, tra_decoder_settings* decoder_cfg, void* decoder_settings, const char* encoder_name, tra_encoder_settings* encoder_cfg, void* encoder_settings, tra_transcoder** trans){
+  int r = 0;
+  tra_decoder_api* decoder_api = NULL;
+  tra_encoder_api* encoder_api = NULL;
+  tra_transcoder_settings* transcoder_cfg = NULL;
+  trans_settings* transcoder_settings = NULL;
+
+
+  if (NULL == ctx) {
+    TRAE("Cannot create a decoder as the given `tra_core*` is NULL.");
+    return -1;
+  }
+
+  if (NULL == decoder_name) {
+    TRAE("Cannot create a decoder as the given API name is NULL.");
+    return -2;
+  }
+
+  if (0 == strlen(decoder_name)) {
+    TRAE("Cannot create a decoder as the given API name is empty.");
+    return -3;
+  }
+
+  if (NULL == encoder_name) {
+    TRAE("Cannot create a decoder as the given API name is NULL.");
+    return -2;
+  }
+
+  if (0 == strlen(encoder_name)) {
+    TRAE("Cannot create a decoder as the given API name is empty.");
+    return -3;
+  }
+
+  if (NULL == ctx->registry) {
+    TRAE("Cannot create a decoder as it seems that the `tra_core::registry` member hasn't been initialized.");
+    return -4;
+  }
+
+  r = tra_registry_get_decoder_api(ctx->registry, decoder_name, &decoder_api);
+  if (r < 0) {
+    TRAE("Cannot create a decoder as failed to find a decoder with the name `%s`.", decoder_name);
+    return -5;
+  }
+
+  r = tra_registry_get_encoder_api(ctx->registry, encoder_name, &encoder_api);
+  if (r < 0) {
+    TRAE("Cannot create a decoder as failed to find a decoder with the name `%s`.", encoder_name);
+    return -5;
+  }
+
+  transcoder_cfg->enc_settings = encoder_cfg;
+  transcoder_cfg->dec_settings = decoder_cfg;
+  transcoder_settings->enc_settings = encoder_settings;
+  transcoder_settings->dec_settings = decoder_settings;
+
+
+  r = tra_combinded_transcoder_create(encoder_api, decoder_api, transcoder_cfg, transcoder_settings, trans);
+
   return r;
 }
 
@@ -197,7 +262,7 @@ int tra_core_graphics_create(
 {
   tra_graphics_api* api = NULL;
   int r = 0;
-  
+
   if (NULL == ctx) {
     TRAE("Cannot create a graphics instance as the given `tra_core*` is NULL.");
     return -1;
@@ -212,7 +277,7 @@ int tra_core_graphics_create(
     TRAE("Cannot create a graphics instance as the given API name is empty.");
     return -3;
   }
-  
+
   if (NULL == ctx->registry) {
     TRAE("Cannot create a graphics instance as it seems that the `tra_core::registry` member hasn't been initialized.");
     return -4;
@@ -229,7 +294,7 @@ int tra_core_graphics_create(
     TRAE("Failed to create a graphics instance for `%s`.", name);
     return -6;
   }
-  
+
   return r;
 }
 
@@ -245,7 +310,7 @@ int tra_core_interop_create(
 {
   tra_interop_api* api = NULL;
   int r = 0;
-  
+
   if (NULL == ctx) {
     TRAE("Cannot create a interop as the given `tra_core*` is NULL.");
     return -1;
@@ -260,7 +325,7 @@ int tra_core_interop_create(
     TRAE("Cannot create a interop as the given API name is empty.");
     return -3;
   }
-  
+
   if (NULL == ctx->registry) {
     TRAE("Cannot create a interop as it seems that the `tra_core::registry` member hasn't been initialized.");
     return -4;
@@ -277,7 +342,7 @@ int tra_core_interop_create(
     TRAE("Failed to create an interop instance for `%s`.", name);
     return -6;
   }
-  
+
   return r;
 }
 
@@ -293,7 +358,7 @@ int tra_core_converter_create(
 {
   tra_converter_api* api = NULL;
   int r = 0;
-  
+
   if (NULL == ctx) {
     TRAE("Cannot create a converter as the given `tra_core*` is NULL.");
     return -1;
@@ -308,7 +373,7 @@ int tra_core_converter_create(
     TRAE("Cannot create a converter as the given API name is empty.");
     return -3;
   }
-  
+
   if (NULL == ctx->registry) {
     TRAE("Cannot create a converter as it seems that the `tra_core::registry` member hasn't been initialized.");
     return -4;
@@ -325,7 +390,7 @@ int tra_core_converter_create(
     TRAE("Failed to create an converter instance for `%s`.", name);
     return -6;
   }
-  
+
   return r;
 }
 
@@ -334,7 +399,7 @@ int tra_core_converter_create(
 int tra_core_api_list(tra_core* ctx) {
 
   int r = 0;
-  
+
   if (NULL == ctx) {
     TRAE("Cannot print the APIs as the given `tra_core` is NULL.");
     return -1;
@@ -371,7 +436,7 @@ int tra_core_api_list(tra_core* ctx) {
 int tra_core_api_get(tra_core* ctx, const char* name, void** result) {
 
   int r = 0;
-  
+
   if (NULL == ctx) {
     TRAE("Cannot get an API: given `tra_core` is NULL.");
     return -1;
@@ -399,7 +464,7 @@ int tra_core_api_get(tra_core* ctx, const char* name, void** result) {
 /* ------------------------------------------------------- */
 
 /*
-  
+
   This function will check if one of the modules has registered
   the `easy` API for the given name. A module, for example the
   NVIDIA module, can provide several functions which make its
@@ -410,12 +475,12 @@ int tra_core_api_get(tra_core* ctx, const char* name, void** result) {
   This sets the `tra_easy_api` to the functions that manage the
   easy access to the implementation (like an encoder, decoder,
   etc).
-  
+
  */
 int tra_core_easy_get(tra_core* ctx, const char* name, tra_easy_api** result) {
 
   int r = 0;
-  
+
   if (NULL == ctx) {
     TRAE("Cannot get the easy api as the given `tra_core*` is NULL.");
     return -10;

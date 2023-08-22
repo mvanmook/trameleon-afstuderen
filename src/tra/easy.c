@@ -8,7 +8,7 @@
 
 /* ------------------------------------------------------- */
 
-struct tra_easy {
+struct tra_easy {//@todo needs adjustment for transcoder which needs 2 api's transcoder doesnt need this
   uint32_t type;          
   tra_core* core_ctx;      
   tra_easy_app_api* app_api;       /* The API that implements the functionality for the easy application. For example this can be the API for a transcoder which manages the decoding, scaling, encoding, etc. */

@@ -12,7 +12,7 @@ int convert_trameleon_to_mft_hardAcc(GUID &hardAcc, uint32_t type) {
   }
 }
 
-int convert_trameleon_to_mft_image_format(uint32_t type, GUID &image_format) {
+int convert_trameleon_to_mft_image_format(GUID &image_format, uint32_t type) {
   switch (type) {
   case TRA_IMAGE_FORMAT_H264: image_format = MFVideoFormat_H264; return 0;
   case TRA_IMAGE_FORMAT_I420: image_format = MFVideoFormat_I420; return 0;

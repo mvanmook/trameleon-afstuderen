@@ -221,7 +221,7 @@ struct tra_easy_app_api {
   int (*destroy)(tra_easy_app_object* obj); /* Used by the application specific type so it can deallocate any internal contexts it uses. E.g. the encoder might have allocated an CUDA based encoder. */
   int (*encode)(tra_easy_app_object* obj, tra_sample* sample, uint32_t type, void* data);  /* An application can implement an `encode()` function when it needs to allocate something. */
   int (*decode)(tra_easy_app_object* obj, uint32_t type, void* data);
-  int (*flush)(tra_easy_app_object* obj); /* Should flush e.g. the encoder in case of an encoder application. */
+  int (*flush)(tra_easy_app_object* obj); /* Should flush e.g. the encoder or transcoder in case of an encoder or transcoder application. */
   int (*set_opt)(tra_easy_app_object* obj, uint32_t opt, va_list args); /* Set an option; used to configure the application. */
 };
 

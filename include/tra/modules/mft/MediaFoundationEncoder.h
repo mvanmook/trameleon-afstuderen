@@ -70,13 +70,13 @@ namespace tra {
      * create output media type
      * @returns <0 if an error occurs otherwise 0
      */
-    static int createOutputMediaType(IMFMediaType **output_media_type, tra_encoder_settings &settings);
+    static int createOutputMediaYype(IMFMediaType **output_media_type, tra_encoder_settings &settings);
 
     /**
      * initiate transform with correct encoder
      * @returns <0 if an error occurs otherwise 0
      */
-    static int findEncoder(const GUID &inputSubtype, const GUID &outputSubtype, IMFTransform**encoderTransform);
+    static int findEncoder(const GUID &input_subtype, const GUID &output_subtype, IMFTransform** encoder_transform);
 
   private:
     /**
@@ -166,10 +166,10 @@ namespace tra {
     DWORD stream_output_id = UINT32_MAX;
 
     // Store stream limit info to determine pipeline capabailities
-    DWORD inputStreamMin = 0;
-    DWORD inputStreamMax = 0;
-    DWORD outputStreamMin = 0;
-    DWORD outputStreamMax = 0;
+    DWORD mInputStreamMin = 0;
+    DWORD mInputStreamMax = 0;
+    DWORD mOutputStreamMin = 0;
+    DWORD mOutputStreamMax = 0;
 
     uint32_t *image_size = NULL;
 

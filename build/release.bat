@@ -109,8 +109,9 @@ cd bin
 
 :: ----------------------------------------------------
 rem test-log.exe
-%debugger% test-module-mft-encoder%debug_flag%.exe
-%debugger% test-module-mft-decoder%debug_flag%.exe
+rem %debugger% test-module-mft-encoder%debug_flag%.exe
+rem %debugger% test-module-mft-decoder%debug_flag%.exe
+%debugger% test-transcoder-mft%debug_flag%.exe
 rem %debugger% test-debug%debug_flag%.exe
 :: ----------------------------------------------------
 

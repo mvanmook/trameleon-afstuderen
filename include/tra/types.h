@@ -239,7 +239,7 @@ typedef struct tra_sample       tra_sample;
 */
 struct tra_sample {                                                 /* A pointer to a `tra_sample` is passed into the `encode()` function of an encoder. */
   int64_t pts;                                                      /* The presentation timestamp of the data that you want to encode. */
-}; 
+};
 
 /* ------------------------------------------------------- */
 

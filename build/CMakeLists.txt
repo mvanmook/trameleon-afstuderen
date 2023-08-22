@@ -84,6 +84,7 @@ list(APPEND tra_sources
   ${src_dir}/tra/modules/easy/easy-encoder.c
   ${src_dir}/tra/modules/easy/easy-decoder.c
   ${src_dir}/tra/modules/easy/easy-transcoder.c
+  ${src_dir}/tra/transcoder.c
   ${src_dir}/dev/generator.c
 #  ${rxtx_dir}/src/log.c
 #  ${rxtx_dir}/src/time.c
@@ -96,7 +97,6 @@ tra_add_library(
   NAME tra
   SOURCES ${tra_sources}
   DEPS ${tra_deps}
-#  LIBS ${tar_libs}
 )
 
 # -----------------------------------------------------------------
@@ -137,7 +137,7 @@ tra_create_test(NAME "compile")
 #tra_create_test(NAME "modules")
 #tra_create_test(NAME "module-x264-encoder")
 #tra_create_test(NAME "opengl" LIBS "cuda")
-#tra_create_test(NAME "opengl-converter")
+tra_create_test(NAME "opengl-converter")
 tra_create_test(NAME "easy-encoder")
 tra_create_test(NAME "easy-decoder")
 tra_create_test(NAME "easy-transcoder")
@@ -168,6 +168,7 @@ endif()
 if (WIN32)
   tra_create_test(NAME "module-mft-encoder")
   tra_create_test(NAME "module-mft-decoder")
+  tra_create_test(NAME "transcoder-mft")
   tra_create_test(NAME "debug")
 endif()
 

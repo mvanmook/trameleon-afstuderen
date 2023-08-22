@@ -44,6 +44,7 @@
 /* ------------------------------------------------------- */
 
 #include <tra/api.h>
+#include <tra/transcoder.h>
 
 /* ------------------------------------------------------- */
 
@@ -73,6 +74,7 @@ TRA_LIB_DLL int tra_core_create(tra_core_settings* cfg, tra_core** ctx);
 TRA_LIB_DLL int tra_core_destroy(tra_core* ctx);
 TRA_LIB_DLL int tra_core_encoder_create(tra_core* ctx, const char* api, tra_encoder_settings* cfg, void* settings, tra_encoder** enc);
 TRA_LIB_DLL int tra_core_decoder_create(tra_core* ctx, const char* api, tra_decoder_settings* cfg, void* settings, tra_decoder** dec);
+TRA_LIB_DLL int tra_core_transcoder_create(tra_core* ctx, const char* decoder_api, tra_decoder_settings* decoder_cfg, void* decoder_settings, const char* encoder_api, tra_encoder_settings* encoder_cfg, void* encoder_settings, tra_transcoder** trans);
 TRA_LIB_DLL int tra_core_graphics_create(tra_core* ctx, const char* api, tra_graphics_settings* cfg, void* settings, tra_graphics** gfx);
 TRA_LIB_DLL int tra_core_interop_create(tra_core* ctx, const char* api, tra_interop_settings* cfg, void* settings, tra_interop** inter);
 TRA_LIB_DLL int tra_core_converter_create(tra_core* ctx, const char* api, tra_converter_settings* cfg, void* settings, tra_converter** converter);

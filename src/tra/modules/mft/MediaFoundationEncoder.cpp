@@ -1,3 +1,12 @@
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Copyright 2017 Intel Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");// you may not use this file except
+// in compliance with the License.// You may obtain a copy of the License at//// http://www.apache.org/licenses/LICENSE-2.0
+// //// Unless required by applicable law or agreed to in writing, software// distributed under the
+// License is distributed on an "AS IS" BASIS,// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+// express or implied.// See the License for the specific language governing permissions and// limitations under the License.
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tra/modules/mft/MediaFoundationEncoder.h"
 #include <mferror.h>
@@ -13,7 +22,7 @@ namespace tra {
     HRESULT hr = S_OK;
     int r = 0;
 
-    r = convert_trameleon_to_mft_image_format(settings->input_format, input_format);
+    r = convert_trameleon_to_mft_image_format(input_format, settings->input_format);
     if (0 > r) {
       TRAE("cannot convert image format");
       goto error;
@@ -54,7 +63,6 @@ namespace tra {
   }
 
   int MediaFoundationEncoder::createOutputSample() {
-
     bool output_provides_buffers = true;
     IMFMediaBuffer *output_buffer = NULL;
     HRESULT hr = S_OK;
@@ -66,13 +74,16 @@ namespace tra {
       goto error;
     }
 
-    /* Flag to specify that the MFT provides the output sample for this stream (thought internal allocation or operating on the input stream)*/
+    // Flag to specify that the MFT provides the output sample for this stream (thought internal allocation or operating on the input stream)
+    if (NULL == &output_stream_info) {
+      TRAE("ouput_stream_info is not initialized");
+      return -10;
+    }
     output_provides_buffers = MFT_OUTPUT_STREAM_PROVIDES_SAMPLES == output_stream_info.dwFlags || MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES == output_stream_info.dwFlags;
 
-    if(true == output_provides_buffers){
+    if(output_provides_buffers){
       output_sample = NULL;
-      TRAE("provided buffers not implemented");
-      return -1;
+      return 0;
     }
 
     hr = queryOutputStreamInfo();
@@ -81,7 +92,6 @@ namespace tra {
       r = -10;
       goto error;
     }
-
     if (0 == output_stream_info.cbSize) { output_stream_info.cbSize = 1024 * 1024; }
 
 
@@ -139,13 +149,13 @@ namespace tra {
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings->output_format, output_format);
+    r = convert_trameleon_to_mft_image_format(output_format, settings->output_format);
     if (0 > r) {
       TRAE("cannot convert image format");
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings->input_format, input_format);
+    r = convert_trameleon_to_mft_image_format(input_format, settings->input_format);
     if (0 > r) {
       TRAE("cannot convert image format");
       goto error;
@@ -292,13 +302,13 @@ namespace tra {
     HRESULT hr = S_OK;
 
     // if the min and max input and output stream counts are the same, the MFT is a Fix stream size. So we cannot add or remove streams
-    hr = encoder_transform->GetStreamLimits(&inputStreamMin, &inputStreamMax, &outputStreamMin, &outputStreamMax);
+    hr = encoder_transform->GetStreamLimits(&mInputStreamMin, &mInputStreamMax, &mOutputStreamMin, &mOutputStreamMax);
     if (S_OK != hr) {
       TRAE("Failed to GetStreamLimits for MFT");
       return -1;
     }
 
-    hr = encoder_transform->GetStreamIDs(inputStreamMin, &stream_input_id, outputStreamMin, &stream_output_id);
+    hr = encoder_transform->GetStreamIDs(mInputStreamMin, &stream_input_id, mOutputStreamMin, &stream_output_id);
     if (E_NOTIMPL == hr) {
       stream_input_id = 0;
       stream_output_id = 0;
@@ -351,8 +361,8 @@ namespace tra {
     return useRefCount;
   }
 
-  int MediaFoundationEncoder::findEncoder(const GUID &inputSubtype, const GUID &outputSubtype, IMFTransform** encoderTransform) {
-
+  // Finds and returns the h264 MFT if available...otherwise fails with style.</para>
+  int MediaFoundationEncoder::findEncoder(const GUID &input_subtype, const GUID &output_subtype, IMFTransform** encoder_transform) {
     HRESULT hr = S_OK;
     int r = 0;
     UINT32 count = 0;
@@ -364,10 +374,10 @@ namespace tra {
     MFT_REGISTER_TYPE_INFO info_output = {0};
 
     info_input.guidMajorType = MFMediaType_Video; //@todo do we need audio
-    info_input.guidSubtype = inputSubtype;
+    info_input.guidSubtype = input_subtype;
 
     info_output.guidMajorType = MFMediaType_Video; //@todo do we need audio
-    info_output.guidSubtype = outputSubtype;
+    info_output.guidSubtype = output_subtype;
 
     hr = MFTEnumEx(MFT_CATEGORY_VIDEO_ENCODER, 0, &info_input, &info_output, &ppCLSIDs, &count);
     if (S_OK != hr) {
@@ -390,7 +400,7 @@ namespace tra {
       goto error;
     }
 
-    *encoderTransform = transform;
+    *encoder_transform = transform;
 
   error:
     for (int i = 0; i < count; i++) { ppCLSIDs[i]->Release(); }
@@ -414,13 +424,7 @@ namespace tra {
 
     hr = encoder_transform->GetInputAvailableType(stream_input_id, 0, &mt);
     if (MF_E_TRANSFORM_TYPE_NOT_SET == hr) {
-      TRAE("we must set the output type before the input type.");
-      r = -10;
-      goto error;
-    }
-
-    if (S_OK != hr) {
-      TRAE("failed get available input types");
+      TRAE("We must set the output type before the input type.");
       r = -10;
       goto error;
     }
@@ -432,7 +436,7 @@ namespace tra {
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings.input_format, InputFormat);
+    r = convert_trameleon_to_mft_image_format(InputFormat, settings.input_format);
     if (0 > r) {
       TRAE("cannot get InputFormat");
       r = -10;
@@ -514,7 +518,7 @@ namespace tra {
     return r;
   }
 
-  int MediaFoundationEncoder::createOutputMediaType(IMFMediaType **output_media_type,
+  int MediaFoundationEncoder::createOutputMediaYype(IMFMediaType **output_media_type,
                                                        tra_encoder_settings &settings) {
     GUID output_format;
     int r = 0;
@@ -541,7 +545,7 @@ namespace tra {
       goto error;
     }
 
-    r = convert_trameleon_to_mft_image_format(settings.output_format, output_format);
+    r = convert_trameleon_to_mft_image_format(output_format, settings.output_format);
     if (0 > r) {
       TRAE("failed to convert image format from trameleon format");
       goto error;
@@ -631,7 +635,7 @@ namespace tra {
     IMFMediaType *output_media_type = NULL;
     int r = 0;
 
-    HRESULT hr = createOutputMediaType(&output_media_type, *settings);
+    HRESULT hr = createOutputMediaYype(&output_media_type, *settings);
     if (S_OK != hr) {
       TRAE("Failed to create output type");
       r = -10;
@@ -639,6 +643,24 @@ namespace tra {
     }
 
     hr = encoder_transform->SetOutputType(stream_output_id, output_media_type, 0);
+    if(MF_E_INVALIDMEDIATYPE == hr){
+      TRAD("MF_E_INVALIDMEDIATYPE when trying to set output type");
+    }
+    if(MF_E_INVALIDSTREAMNUMBER == hr){
+      TRAD("MF_E_INVALIDSTREAMNUMBER when trying to set output type");
+    }
+    if(MF_E_INVALIDTYPE == hr){
+      TRAD("MF_E_INVALIDTYPE when trying to set output type");
+    }
+    if(MF_E_TRANSFORM_CANNOT_CHANGE_MEDIATYPE_WHILE_PROCESSING == hr){
+      TRAD("MF_E_TRANSFORM_CANNOT_CHANGE_MEDIATYPE_WHILE_PROCESSING when trying to set output type");
+    }
+    if(MF_E_TRANSFORM_TYPE_NOT_SET == hr){
+      TRAD("MF_E_TRANSFORM_TYPE_NOT_SET when trying to set output type");
+    }
+    if(MF_E_UNSUPPORTED_D3D_TYPE == hr){
+      TRAD("MF_E_UNSUPPORTED_D3D_TYPE when trying to set output type");
+    }
     if (S_OK != hr) {
       TRAE("Failed to set output type");
       r = -10;
@@ -872,7 +894,6 @@ do{
   }
 
   int MediaFoundationEncoder::processData() {
-
     HRESULT hr = S_OK;
     int r = 0;
 
@@ -913,9 +934,7 @@ do{
 
     do {
       hr = encoder_transform->ProcessInput(stream_input_id, input_sample, 0);
-      if(S_OK == hr) {
-        break;
-      }
+      if(S_OK == hr) break;
 
       if (S_OK != hr && MF_E_NOTACCEPTING != hr) {
         TRAE("failed to processInput");
@@ -931,17 +950,11 @@ do{
         goto error;
       }
 
-      if (MFT_OUTPUT_STATUS_SAMPLE_READY != status) {
-        continue;
-      }
-
-      while (MF_E_TRANSFORM_NEED_MORE_INPUT != hr) {
+      if (MFT_OUTPUT_STATUS_SAMPLE_READY == status) {
+        while (MF_E_TRANSFORM_NEED_MORE_INPUT != hr) {
         // Generate the encoded_data sample
         hr = encoder_transform->ProcessOutput(0, 1, &mft_output_data, &dwStatus);
-        if(MF_E_TRANSFORM_NEED_MORE_INPUT == hr) {
-          break;
-        }
-
+        if(MF_E_TRANSFORM_NEED_MORE_INPUT == hr) break;
         if (S_OK != hr && MF_E_TRANSFORM_NEED_MORE_INPUT != hr && MF_E_TRANSFORM_STREAM_CHANGE != hr) {
           TRAE("failed to process output");
           r = -10;
@@ -950,7 +963,6 @@ do{
 
         if (MF_E_TRANSFORM_STREAM_CHANGE == hr) {
           IMFMediaType *mediatype = NULL;
-
           hr = encoder_transform->GetOutputAvailableType(stream_output_id, 0, &mediatype);
           if (S_OK != hr) {
             TRAE("failed to handle MF_E_TRANSFORM_STREAM_CHANGE");
@@ -972,7 +984,7 @@ do{
           r = -10;
           goto error;
         }
-
+        }
       }
     } while (hr == MF_E_TRANSFORM_NEED_MORE_INPUT);
 

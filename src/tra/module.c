@@ -24,6 +24,8 @@ struct tra_decoder {
   tra_decoder_object* obj;
 };
 
+
+
 /* ------------------------------------------------------- */
 
 struct tra_graphics {
@@ -349,6 +351,7 @@ int tra_graphics_create(
 int tra_graphics_destroy(tra_graphics* ctx) {
 
   TRAE("@todo destroy the graphics.");
+  return -1;
 }
 
 int tra_graphics_draw(tra_graphics* ctx, uint32_t type, void* data) {
@@ -458,6 +461,7 @@ int tra_interop_create(
 int tra_interop_destroy(tra_interop* ctx) {
 
   TRAE("@todo destroy the interop.");
+  return -1;
 }
 
 /* ------------------------------------------------------- */

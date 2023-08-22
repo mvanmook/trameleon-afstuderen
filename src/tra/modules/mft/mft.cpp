@@ -585,14 +585,14 @@ int isCapabilitibleEncoder(tra_encoder_settings *cfg) {
   IMFMediaType *pMediaTypeIn = NULL;
   IMFMediaType *pMediaTypeOut = NULL;
 
-  r = convert_trameleon_to_mft_image_format(enc_cfg.input_format, input_subtype);
+  r = convert_trameleon_to_mft_image_format(input_subtype, enc_cfg.input_format);
   if(0 > r){
     TRAE("failed to get convert input subtype");
     r = -10;
     goto error;
   }
 
-  r = convert_trameleon_to_mft_image_format(enc_cfg.input_format, output_subtype);
+  r = convert_trameleon_to_mft_image_format(output_subtype, enc_cfg.input_format);
   if(0 > r){
     TRAE("failed to get convert output subtype");
     r = -10;
@@ -621,7 +621,7 @@ int isCapabilitibleEncoder(tra_encoder_settings *cfg) {
     goto error;
   };
 
-  r = tra::MediaFoundationEncoder::createOutputMediaType(&pMediaTypeOut, enc_cfg);
+  r = tra::MediaFoundationEncoder::createOutputMediaYype(&pMediaTypeOut, enc_cfg);
   if (0 > r) {
     TRAE("cannot create output media type");
     goto error;

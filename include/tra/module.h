@@ -116,7 +116,12 @@ typedef struct tra_decoder_api           tra_decoder_api;        /* Defines the 
 typedef struct tra_decoder_object        tra_decoder_object;     /* Opaque: set to the decoder specific context. This is used when we're using the registry API that loads shared libraries. */
 typedef struct tra_decoder_callbacks     tra_decoder_callbacks;
 typedef struct tra_decoder_settings      tra_decoder_settings;
-                                         
+
+typedef struct tra_transcoder            tra_transcoder;         /* Public opaque type that you use to interact with the public API functions that start with the transcoder. */
+typedef struct tra_transcoder_api        tra_transcoder_api;        /* Defines the interface for a transcoder. */
+typedef struct tra_transcoder_object     tra_transcoder_object;     /* Opaque: set to the transcoder specific context. This is used when we're using the registry API that loads shared libraries. */
+typedef struct tra_transcoder_settings   tra_transcoder_settings;
+
 typedef struct tra_graphics              tra_graphics;           /* Public opaque type that you use to interact with the public API functions that start with `tra_graphics_`. */ 
 typedef struct tra_graphics_api          tra_graphics_api;       /* The interface for graphics interop. */
 typedef struct tra_graphics_settings     tra_graphics_settings;  /* Settings which are used when we create an graphics interop instance. */
@@ -151,7 +156,11 @@ typedef int(*tra_converted_callback)(uint32_t type, void* data, void* user); /* 
 
 /* ------------------------------------------------------- */
 
-typedef int tra_load_func(tra_registry* reg); 
+typedef int tra_load_func(tra_registry* reg);
+
+/* ------------------------------------------------------- */
+
+
 
 /* ------------------------------------------------------- */
 
