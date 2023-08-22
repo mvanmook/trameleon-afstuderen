@@ -215,11 +215,11 @@ int main(int argc, const char* argv[]) {
 
 static int on_encoded_data(uint32_t type, void* data, void* user) {
 
-  tra_memory_h264* encoded = (tra_memory_h264*) data;
+  tra_encoded_host_memory* encoded = (tra_encoded_host_memory*) data;
   FILE* fp = (FILE*) user;
   int r = 0;
 
-  if (TRA_MEMORY_TYPE_H264 != type) {
+  if (TRA_MEMORY_TYPE_HOST_H264 != type) {
     TRAE("Received encoded data, but we don't handle this specific type: %u. (exiting).", type);
     exit(EXIT_FAILURE);
   }

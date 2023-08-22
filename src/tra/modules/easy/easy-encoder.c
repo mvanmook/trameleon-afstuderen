@@ -60,7 +60,7 @@ static int tra_easy_encoder_create(tra_easy* ez, tra_easy_app_object** result) {
   const char* encoders[] = {
     "nvenchost",
     "nvenccuda",
-    "x264enc",
+    "x264",
     NULL
   };
 
@@ -153,7 +153,7 @@ static int tra_easy_encoder_set_opt(
     }
 
     case TRA_EOPT_INPUT_FORMAT: {
-      app->encoder_cfg.image_format = va_arg(args, uint32_t);
+      app->encoder_cfg.input_format = va_arg(args, uint32_t);
       break;
     }
 

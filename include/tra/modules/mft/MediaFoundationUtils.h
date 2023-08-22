@@ -1,31 +1,20 @@
-#ifndef TRA_MFT_UTILS_H
-#define TRA_MFT_UTILS_H
-
-/*
-
-  ┌─────────────────────────────────────────────────────────────────────────────────────┐
-  │                                                                                     │
-  │   ████████╗██████╗  █████╗ ███╗   ███╗███████╗██╗     ███████╗ ██████╗ ███╗   ██╗   │
-  │   ╚══██╔══╝██╔══██╗██╔══██╗████╗ ████║██╔════╝██║     ██╔════╝██╔═══██╗████╗  ██║   │
-  │      ██║   ██████╔╝███████║██╔████╔██║█████╗  ██║     █████╗  ██║   ██║██╔██╗ ██║   │
-  │      ██║   ██╔══██╗██╔══██║██║╚██╔╝██║██╔══╝  ██║     ██╔══╝  ██║   ██║██║╚██╗██║   │
-  │      ██║   ██║  ██║██║  ██║██║ ╚═╝ ██║███████╗███████╗███████╗╚██████╔╝██║ ╚████║   │
-  │      ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝   │
-  │                                                                 www.trameleon.org   │
-  └─────────────────────────────────────────────────────────────────────────────────────┘
-
-*/
-
-#include <stdint.h>
+#ifndef TRAMELEON_MEDIAFOUNDATIONUTILS_H
+#define TRAMELEON_MEDIAFOUNDATIONUTILS_H
+#include <codecapi.h>
+#include <cstdint>
 #include <mfapi.h>
 
-/* ------------------------------------------------------- */
+template <class T> int Release(T **ppT) {
+  if (*ppT) {
+    HRESULT hr = (*ppT)->Release();
+    if (FAILED(hr)) { return -1; }
+    *ppT = NULL;
+  }
+  return 0;
+}
 
-int mft_videoformat_to_imageformat(GUID fmt, uint32_t* outFormat);
-int mft_imageformat_to_videoformat(uint32_t imageFormat, GUID* outFormat); /* Converts a Trameleon image format into a MFT format. */
-const char* mft_videoformat_to_string(const GUID& guid);
-int mft_print_mediatype(IMFMediaType* mt);
-
-/* ------------------------------------------------------- */
-
-#endif
+int convert_trameleon_to_mft_hardAcc(GUID &hardAcc, uint32_t type);
+int convert_trameleon_to_mft_image_format(uint32_t type, GUID &image_format);
+int convert_trameleon_to_mft_profile(uint32_t &profile, uint32_t type);
+int convert_mft_to_trameleon_image_format(GUID &image_format, uint32_t &type);
+#endif // TRAMELEON_MEDIAFOUNDATIONUTILS_H

@@ -144,6 +144,60 @@
 #define TRA_IMAGE_FORMAT_BGR  0x000e                                 /* packed bgr 24bits */
 #define TRA_IMAGE_FORMAT_BGRA 0x000f                                 /* packed bgr 32bits */
 #define TRA_IMAGE_FORMAT_RGB  0x0010                                 /* packed rgb 24bits */
+#define TRA_IMAGE_FORMAT_AI44 0x0011
+#define TRA_IMAGE_FORMAT_AYUV 0x0012
+#define TRA_IMAGE_FORMAT_YUY2 0x0013
+#define TRA_IMAGE_FORMAT_YVYU 0x0014
+#define TRA_IMAGE_FORMAT_YVU9 0x0015
+#define TRA_IMAGE_FORMAT_NV11 0x0016
+#define TRA_IMAGE_FORMAT_IYUV 0x0017
+#define TRA_IMAGE_FORMAT_Y210 0x0018
+#define TRA_IMAGE_FORMAT_Y216 0x0019
+#define TRA_IMAGE_FORMAT_Y410 0x001a
+#define TRA_IMAGE_FORMAT_Y416 0x001b
+#define TRA_IMAGE_FORMAT_Y41P 0x001c
+#define TRA_IMAGE_FORMAT_Y41T 0x001d
+#define TRA_IMAGE_FORMAT_Y42T 0x001e
+#define TRA_IMAGE_FORMAT_P210 0x001f
+#define TRA_IMAGE_FORMAT_P010 0x0020
+#define TRA_IMAGE_FORMAT_P016 0x0021
+#define TRA_IMAGE_FORMAT_v216 0x0022
+#define TRA_IMAGE_FORMAT_v410 0x0023
+#define TRA_IMAGE_FORMAT_MP43 0x0024
+#define TRA_IMAGE_FORMAT_MP4S 0x0025
+#define TRA_IMAGE_FORMAT_M4S2 0x0026
+#define TRA_IMAGE_FORMAT_MP4V 0x0027
+#define TRA_IMAGE_FORMAT_WMV1 0x0028
+#define TRA_IMAGE_FORMAT_WMV2 0x0029
+#define TRA_IMAGE_FORMAT_WMV3 0x002a
+#define TRA_IMAGE_FORMAT_WVC1 0x002b
+#define TRA_IMAGE_FORMAT_MSS1 0x002c
+#define TRA_IMAGE_FORMAT_MSS2 0x002d
+#define TRA_IMAGE_FORMAT_MPG1 0x002e
+#define TRA_IMAGE_FORMAT_DVSL 0x002f
+#define TRA_IMAGE_FORMAT_DVSD 0x0030
+#define TRA_IMAGE_FORMAT_DVHD 0x0031
+#define TRA_IMAGE_FORMAT_DV25 0x0032
+#define TRA_IMAGE_FORMAT_DV50 0x0033
+#define TRA_IMAGE_FORMAT_DVH1 0x0034
+#define TRA_IMAGE_FORMAT_DVC  0x0035
+#define TRA_IMAGE_FORMAT_H264 0x0036
+#define TRA_IMAGE_FORMAT_H265 0x0037
+#define TRA_IMAGE_FORMAT_MJPG 0x0038
+#define TRA_IMAGE_FORMAT_4200 0x0039
+#define TRA_IMAGE_FORMAT_HEVC 0x003a
+#define TRA_IMAGE_FORMAT_HEVC_ES 0x003b
+#define TRA_IMAGE_FORMAT_VP80 0x003c
+#define TRA_IMAGE_FORMAT_VP90 0x003d
+
+/* ------------------------------------------------------- */
+
+#define TRA_Profile_H264_BASE 0x0000
+#define TRA_Profile_H264_MAIN 0x0001
+#define TRA_Profile_H264_HIGH 0x0003
+#define TRA_Profile_H264_H10 0x0004
+#define TRA_Profile_H264_H422 0x0005
+#define TRA_Profile_H264_H444 0x0006
 
 /* ------------------------------------------------------- */
 
@@ -171,7 +225,7 @@
 /* ------------------------------------------------------- */
 
 typedef struct tra_memory_image tra_memory_image;
-typedef struct tra_memory_h264  tra_memory_h264;
+typedef struct tra_memory_h264 tra_memory_h264;
 typedef struct tra_sample       tra_sample;
 
 /* ------------------------------------------------------- */
@@ -202,7 +256,7 @@ struct tra_memory_image {                                           /* The `tra_
 /* ------------------------------------------------------- */
 
 struct tra_memory_h264 {                                            /* The `tra_memory_h264` is used by encoders and CPU based decoders. It should hold Annex-B H264. */
-  uint8_t* data;                                                    /* Pointer to the H264.  */
+  uint8_t* data;/* Pointer to the H264.  */
   uint32_t size;                                                    /* The size of the `data` in bytes. */
   uint32_t flags;                                                   /* One of the `TRA_MEMORY_FLAG_*` values. */
 };

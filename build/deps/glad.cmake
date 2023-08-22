@@ -39,7 +39,12 @@ add_subdirectory("${glad_SOURCE_DIR}/cmake" glad_cmake)
 
 glad_add_library(glad_gl_core_33 REPRODUCIBLE API gl:core=3.3)
 
+# Get the target include directory so we can find `glad/gl.h`. 
+get_target_property(glad_inc_dir glad_gl_core_33 INCLUDE_DIRECTORIES)
+include_directories(${glad_inc_dir})
+
 list(APPEND tra_libs glad_gl_core_33)
+list(APPEND tra_deps glad_gl_core_33)
 
 # -----------------------------------------------------------------
 

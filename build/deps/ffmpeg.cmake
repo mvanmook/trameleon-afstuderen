@@ -137,24 +137,25 @@ endif()
 
 if (WIN32)
 
+  set(ffmpeg_prefix ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg-prefix)
   set(ffmpeg_lib_dir ${ffmpeg_prefix}/src/ffmpeg/lib)
   set(ffmpeg_bin_dir ${ffmpeg_prefix}/src/ffmpeg/bin)
   set(ffmpeg_inc_dir ${ffmpeg_prefix}/src/ffmpeg/include)
 
   list(APPEND tra_libs
-    ${ffmpeg_lib_dir}/libavcodec.dll.a
-    ${ffmpeg_lib_dir}/libavdevice.dll.a
-    ${ffmpeg_lib_dir}/libavfilter.dll.a
-    ${ffmpeg_lib_dir}/libavformat.dll.a
-    ${ffmpeg_lib_dir}/libavutil.dll.a
-    ${ffmpeg_lib_dir}/libswresample.dll.a
-    ${ffmpeg_lib_dir}/libswscale.dll.a
+    ${ffmpeg_lib_dir}/avcodec.lib
+    ${ffmpeg_lib_dir}/avdevice.lib
+    ${ffmpeg_lib_dir}/avfilter.lib
+    ${ffmpeg_lib_dir}/avformat.lib
+    ${ffmpeg_lib_dir}/avutil.lib
+    ${ffmpeg_lib_dir}/swresample.lib
+    ${ffmpeg_lib_dir}/swscale.lib
     )
 
-  list(APPEND tra_inc_dirs
-    ${ffmpeg_inc_dir}
-    )
+#  message(FATAL_ERROR ">> ${ffmpeg_lib_dir}/libswscale.lib")
 
+  include_directories(${ffmpeg_inc_dir})
+    
   if (NOT EXISTS ${inst_dir}/bin/avcodec-59.dll)
     set(ffmpeg_dlls
       ${ffmpeg_bin_dir}/avcodec-59.dll
@@ -171,11 +172,10 @@ if (WIN32)
   if (NOT EXISTS ${ffmpeg_prefix}/src/ffmpeg/lib/avcodec.lib)
 
     include(ExternalProject)
-    include(${deps_dir}/yasm.cmake)
 
     ExternalProject_Add(
       ffmpeg
-      URL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n5.0-latest-win64-lgpl-shared-5.0.zip
+      URL https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-11-30-12-36/ffmpeg-n5.1.2-8-g5746987bad-win64-lgpl-shared-5.1.zip
       UPDATE_COMMAND ""
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
@@ -183,13 +183,12 @@ if (WIN32)
       PREFIX ${ffmpeg_prefix}
       )
 
-    list(APPEND tra_deps
-      ffmpeg
-      )
+    list(APPEND tra_deps ffmpeg)
     
   endif()
+
+  
 
 endif()
 
 # -----------------------------------------------------------------
-

@@ -1,8 +1,6 @@
 /* ------------------------------------------------------- */
 
-#define GL_GLEXT_PROTOTYPES
-#include <GL/glcorearb.h>
-
+#include <glad/gl.h>
 #include <stdlib.h>
 #include <tra/modules/opengl/opengl-api.h>
 #include <tra/registry.h>
@@ -20,7 +18,7 @@ static tra_opengl_api opengl_api;
 /* ------------------------------------------------------- */
 
 /*
-  This is the `laod_functions()` implementation of the
+  This is the `load_functions()` implementation of the
   `tra_opengl_api`. We will load the GL function form the OpenGL
   context which is made "current" at the the that you call this
   function. See `opengl-api.h` for more info about function

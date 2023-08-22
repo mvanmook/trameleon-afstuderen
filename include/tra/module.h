@@ -98,6 +98,7 @@
 
 /* ------------------------------------------------------- */
 
+#include "capabilityHandler.h"
 #include <stdint.h>
 #include <tra/api.h>
 
@@ -165,10 +166,17 @@ struct tra_decoder_settings {
   tra_decoder_callbacks callbacks; /* The callbacks that get called by the decoder. */
   uint32_t image_width;            /* The width of the video frames. */
   uint32_t image_height;           /* The height of the video frames. */
-  uint32_t output_type;            /* The preferred output type which can be any of the `TRA_MEMORY_TYPE_*` types. This can be used to implement decode on device and then use the decoded on-device memory to perform a (different) encode using the on-device memory to skip a memory copy. */
+  uint32_t output_format;            /* The preferred output type which can be any of the `TRA_OUTPUT_TYPE_*` types. This can be used to implement decode on device and then use the decoded on-device memory to perform a (different) encode using the on-device memory to skip a memory copy. */
+  uint32_t input_format;
+  uint32_t fps_num;
+  uint32_t fps_den;
+  uint32_t bitrate;
 };
 
 /* ------------------------------------------------------- */
+
+
+typedef struct capability capability;
 
 struct tra_decoder_api {
   
@@ -180,6 +188,8 @@ struct tra_decoder_api {
   int (*create)(tra_decoder_settings* cfg, void* settings, tra_decoder_object** obj);
   int (*destroy)(tra_decoder_object* obj);
   int (*decode)(tra_decoder_object* obj, uint32_t type, void* data);
+  int (*isCapable)(tra_decoder_settings* cfg);
+  int (*getCapability)(capability* (*output)[], uint32_t size);
 };
 
 /* ------------------------------------------------------- */
@@ -196,9 +206,12 @@ struct tra_encoder_settings {
   tra_encoder_callbacks callbacks; /* The callbacks that are set by the user and called by the encoder. */
   uint32_t image_width;            /* Width of the video frames. */
   uint32_t image_height;           /* Height of the video frames. */
-  uint32_t image_format;           /* Pixel format of the video frames. */
+  uint32_t input_format;           /* Pixel format of the video frames. */
+  uint32_t output_format;          /* The preferred output type which can be any of the `TRA_OUTPUT_TYPE_*` types. This can be used to implement decode on device and then use the decoded on-device memory to perform a (different) encode using the on-device memory to skip a memory copy. */
   uint32_t fps_num;                /* Framerate numerator. For 25 frames per seconds, `fps_num` and `fps_den` will be `fps_num = 25`, `fps_den = 1`.  */
   uint32_t fps_den;                /* Framerate denominator. For 25 frames per seconds, `fps_num` and `fps_den` will be `fps_num = 25`, `fps_den = 1`.  */
+  uint32_t bitrate;
+  uint32_t profile;
 };
 
 /* ------------------------------------------------------- */
@@ -212,8 +225,10 @@ struct tra_encoder_api {
   /* Plugin API */
   int (*create)(tra_encoder_settings* cfg, void* settings, tra_encoder_object** obj); 
   int (*destroy)(tra_encoder_object* obj);
-  int (*encode)(tra_encoder_object* obj, tra_sample* sample, uint32_t type, void* data);
-  int (*flush)(tra_encoder_object* obj); 
+  int (*encode)(tra_encoder_object* obj, uint32_t type, void* data);
+  int (*flush)(tra_encoder_object* obj);
+  int (*isCapable)(tra_encoder_settings* cfg);
+  int (*getCapability)(capability* (*output)[], uint32_t size);
 };
 
 /* ------------------------------------------------------- */
@@ -326,7 +341,7 @@ struct tra_easy_api {
 /* Encode  */
 TRA_LIB_DLL int tra_encoder_create(tra_encoder_api* api, tra_encoder_settings* cfg, void* settings, tra_encoder** enc);
 TRA_LIB_DLL int tra_encoder_destroy(tra_encoder* enc);
-TRA_LIB_DLL int tra_encoder_encode(tra_encoder* enc, tra_sample* sample, uint32_t type, void* data);
+TRA_LIB_DLL int tra_encoder_encode(tra_encoder* enc, uint32_t type, void* data);
 TRA_LIB_DLL int tra_encoder_flush(tra_encoder* enc); /* Flush all currently queued frames. */
 
 /* Decode */

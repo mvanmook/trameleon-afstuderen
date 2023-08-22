@@ -1,124 +1,187 @@
-#ifndef TRA_MFT_ENCODER_H
-#define TRA_MFT_ENCODER_H
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Copyright 2017 Intel Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");// you may not use this file except
+// in compliance with the License.// You may obtain a copy of the License at//// http://www.apache.org/licenses/LICENSE-2.0
+// //// Unless required by applicable law or agreed to in writing, software// distributed under the
+// License is distributed on an "AS IS" BASIS,// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+// express or implied.// See the License for the specific language governing permissions and// limitations under the License.
+/////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
+#ifndef _ENCODE_TRANSFORM_H_
+#define _ENCODE_TRANSFORM_H_
 
-  ┌─────────────────────────────────────────────────────────────────────────────────────┐
-  │                                                                                     │
-  │   ████████╗██████╗  █████╗ ███╗   ███╗███████╗██╗     ███████╗ ██████╗ ███╗   ██╗   │
-  │   ╚══██╔══╝██╔══██╗██╔══██╗████╗ ████║██╔════╝██║     ██╔════╝██╔═══██╗████╗  ██║   │
-  │      ██║   ██████╔╝███████║██╔████╔██║█████╗  ██║     █████╗  ██║   ██║██╔██╗ ██║   │
-  │      ██║   ██╔══██╗██╔══██║██║╚██╔╝██║██╔══╝  ██║     ██╔══╝  ██║   ██║██║╚██╗██║   │
-  │      ██║   ██║  ██║██║  ██║██║ ╚═╝ ██║███████╗███████╗███████╗╚██████╔╝██║ ╚████║   │
-  │      ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝   │
-  │                                                                 www.trameleon.org   │
-  └─────────────────────────────────────────────────────────────────────────────────────┘
-
-  MEDIA FOUNDATION ENCODER
-  ========================
-
-  GENERAL INFO:
-
-    The `MediaFoundationEncoder` provides a wrapper around the
-    Windows Media Foundation Transforms. This implements a H264
-    encoder.
-
-    If you want to get an understanding of how MFTs work, start
-    by reading [About MFTs][3]. A great introduction to the Media
-    Foundation Transforms is the [Basic Processing Model][0]
-    article. You should also be ware of [Media Foundation and
-    COM][1] which explains why we use COINIT_MULTITHREADED.
-
-  REFERENCES: 
-
-    [0]: https://docs.microsoft.com/en-us/windows/win32/medfound/basic-mft-processing-model "Basic Processing Model"
-    [1]: https://docs.microsoft.com/en-us/windows/win32/medfound/media-foundation-and-com "Media Foundation and COM"
-    [2]: https://docs.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-coinitializeex "CoInitializeEx" 
-    [3]: https://docs.microsoft.com/en-us/windows/win32/medfound/about-mfts "About MFTs"
-    [4]: https://msdn.microsoft.com/en-us/library/windows/desktop/dd318776(v=vs.85).aspx "eAVEncH264VProfile enumeration"
-    [5]: https://docs.microsoft.com/en-us/windows/win32/medfound/h-264-video-encoder "H.264 Video Encoder"
-    [6]: https://source.chromium.org/chromium/chromium/src/+/main:media/gpu/windows/media_foundation_video_encode_accelerator_win.cc?q=media_foundation_video_encode_accelerator_win.cc&ss=chromium%2Fchromium%2Fsrc "Chromium implementation"
-    [7]: https://docs.microsoft.com/en-us/windows/win32/api/mftransform/nf-mftransform-imftransform-getinputavailabletype 
-    [8]: https://docs.microsoft.com/en-us/windows/win32/api/mftransform/nf-mftransform-imftransform-processinput
-    [9]: https://docs.microsoft.com/en-us/windows/win32/api/mftransform/nf-mftransform-imftransform-processoutput 
-
- */
-
-/* ------------------------------------------------------- */
-
-#define WIN32_LEAN_AND_MEAN
-#include <Mftransform.h> /* IMFTransform. */
-
-/* ------------------------------------------------------- */
-
-#include <fstream> /* @todo remove; onlu used during development to test if the data we received was usable. */
-
-/* ------------------------------------------------------- */
-
-struct tra_sample;
-
-/* ------------------------------------------------------- */
+#include "MediaFoundationUtils.h"
+#include "tra/module.h"
+#include "tra/types.h"
+#include <Propvarutil.h>
+#include <cstdint>
+#include <mfapi.h>
+#include <mftransform.h>
 
 namespace tra {
-
-  /* ------------------------------------------------------- */
-  
-  class MediaFoundationEncoderSettings {
-  public:
-    bool isValid();
-
-  public:
-
-    int (*on_encoded_data)(uint32_t type, void* data, void* user);
-
-    uint32_t image_format = 0;
-    uint32_t image_width = 0;
-    uint32_t image_height = 0;
-    uint32_t bitrate = 0;
-    uint32_t fps_num = 0;
-    uint32_t fps_den = 0;
-    void* user = NULL;
-  };
-
-  /* ------------------------------------------------------- */
+  struct EncoderOutput {
+    byte *pEncodedData;
+    DWORD numBytes;
+    LONGLONG timestamp;
+    LONGLONG duration;
+    HRESULT returnCode;
+  } typedef EncoderOutput;
 
   class MediaFoundationEncoder {
   public:
-    MediaFoundationEncoder() = default;
-    ~MediaFoundationEncoder();
-    int init(MediaFoundationEncoderSettings& cfg);
+    /**
+     * initiate required variables
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int init(tra_encoder_settings *cfg);
+
+    /**
+     * encode @param data
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int encode(tra_memory_image *data);
+
+    /**
+     * destroy all variables
+     * @returns <0 if an error occurs otherwise 0
+     */
     int shutdown();
-    int encode(tra_sample* inSample, uint32_t type, void* data);  /* Encode the `data`; the type defines how we should cast the `data`. See `tra/types.h` for the available `TRA_MEMORY_TYPE_*` types. */
+
+    /**
+     * flush the transform
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int flush();
+
+    /**
+     * drain the transform
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int drain();
+
+    /**
+     * create input media type
+     * @returns <0 if an error occurs otherwise 0
+     */
+    static int createInputMediaType(IMFMediaType **input_media_type, tra_encoder_settings &settings, IMFTransform* encoder_transform, uint32_t  stream_input_id);
+
+    /**
+     * create output media type
+     * @returns <0 if an error occurs otherwise 0
+     */
+    static int createOutputMediaType(IMFMediaType **output_media_type, tra_encoder_settings &settings);
+
+    /**
+     * initiate transform with correct encoder
+     * @returns <0 if an error occurs otherwise 0
+     */
+    static int findEncoder(const GUID &inputSubtype, const GUID &outputSubtype, IMFTransform**encoderTransform);
 
   private:
-    int setOutputMediaType();
+    /**
+     * create input buffers
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int createInputSample();
+
+    /**
+     * create output buffers
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int createOutputSample();
+
+    /**
+     * load stream ids into variables
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int queryStreamCapabilities();
+
+    /**
+     * checks if mft uses recounts for buffers
+     * @return <0 if an error occurs otherwise 0 for false and 1 for true
+     */
+    int doesInputStreamUseRefCounts();
+
+    /**
+     * set input type
+     * @returns <0 if an error occurs otherwise 0
+     */
     int setInputMediaType();
-    int createOutputBuffers();
-    int doesOutputProvideBuffers(bool& doesProvide);
-    int doesInputStreamUseRefCounts(bool& useRefCount); /* When `useRefCount` is set to true, it means that the input streams holds a reference to the samples we pass into `ProcessInput()` and we're not allowed to (re)use them until they are released. */
-    int processOutput(); /* The counter part of `encode()`. This will extract the coded data from the encoder and is called internally. */
-    int processOutputWithClientBuffers(); /* This implementation must provide buffers. */
-    int processOutputWithTransformBuffers(); /* The transform provides output buffers. */
 
-  private:
-    MediaFoundationEncoderSettings settings; /* The settings passed into `init()`. */
-    IMFTransform* encoder_transform = NULL;
-    IMFSample* output_sample = NULL;
-    IMFMediaBuffer* output_media_buffer = NULL;
-    bool output_provides_buffers = false;
-    bool input_uses_refcount = false; /* Set via `init()`, when true, we are not allowed to use the samples we pass into `ProcessInput()` until the MFT releases them. */
-    DWORD stream_output_id = UINT32_MAX;
+    /**
+     * set output type
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int setOutputMediaType();
+
+    /**
+     * load input stream info into variables
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int queryInputStreamInfo();
+
+    /**
+     * load output stream info into variables
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int queryOutputStreamInfo();
+
+    /**
+     * processes the data through the transform
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int processData();
+
+    /**
+     * this function retrieves the data from the transform and calls callback in settings
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int getOutput();
+
+    /**
+     * this function inputs the data into the transform
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int addSample(tra_memory_image *data);
+
+    /**
+     * sends the start of stream message
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int sendStreamStartMessage();
+
+    /**
+     * sends the end of stream message
+     * @returns <0 if an error occurs otherwise 0
+     */
+    int sendStreamEndMessage();
+
+    IMFTransform *encoder_transform = NULL; // pointer to the encoder MFT
+
+    MFT_INPUT_STREAM_INFO input_stream_info;
+    MFT_OUTPUT_STREAM_INFO output_stream_info;
+
     DWORD stream_input_id = UINT32_MAX;
+    DWORD stream_output_id = UINT32_MAX;
+
+    // Store stream limit info to determine pipeline capabailities
+    DWORD inputStreamMin = 0;
+    DWORD inputStreamMax = 0;
+    DWORD outputStreamMin = 0;
+    DWORD outputStreamMax = 0;
+
+    uint32_t *image_size = NULL;
+
+    LONGLONG timestamp = 0;
+    IMFMediaBuffer *input_buffer = NULL;
+    IMFSample *input_sample = NULL;
+    IMFSample *output_sample = NULL;
+    tra_encoder_settings *settings;
 
     uint32_t tmp_frame_num = 0;
-    uint64_t tmp_frame_time = 0;
-    std::ofstream tmp_ofs;
+    bool input_uses_refcount = false;
   };
 
-  /* ------------------------------------------------------- */
-  
-}; /* namespace tra */
-
-/* ------------------------------------------------------- */
-
-#endif
+} // namespace tra
+#endif // _ENCODE_TRANSFORM_H_

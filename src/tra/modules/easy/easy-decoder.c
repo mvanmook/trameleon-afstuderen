@@ -294,7 +294,7 @@ static int tra_easy_decoder_set_opt(
     }
 
     case TRA_EOPT_OUTPUT_TYPE: {
-      app->decoder_cfg.output_type = va_arg(args, uint32_t);
+      app->decoder_cfg.output_format = va_arg(args, uint32_t);
       break;
     }
 

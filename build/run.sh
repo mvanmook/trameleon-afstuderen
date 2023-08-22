@@ -1,5 +1,5 @@
 #!/bin/bash
-# ----------------------------------------------------
+
 #
 #
 #  ████████╗██████╗  █████╗ ███╗   ███╗███████╗██╗     ███████╗ ██████╗ ███╗   ██╗
@@ -61,13 +61,13 @@ export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${inst_dir}/lib
 #${debugger} ./test-module-vtbox-encoder${debug_flag}
 #${debugger} ./test-module-vtbox-decoder${debug_flag}
 #${debugger} ./test-module-nvidia-encoder${debug_flag}
-${debugger} ./test-module-nvidia-decoder${debug_flag}
+#${debugger} ./test-module-nvidia-decoder${debug_flag}
 #${debugger} ./test-module-nvidia-transcoder${debug_flag}
 #${debugger} ./test-module-nvidia-graphics${debug_flag}
 #${debugger} ./test-module-nvidia-converter${debug_flag}
 #${debugger} ./test-easy-encoder${debug_flag}
 #${debugger} ./test-easy-decoder${debug_flag}
-#${debugger} ./test-easy-transcoder${debug_flag} 
+${debugger} ./test-easy-transcoder${debug_flag} 
 #nvprof ${debugger} ./test-module-nvidia-converter${debug_flag} && ffmpeg -s 960x540 -pix_fmt nv12 -i "converted_960x540_yuv420pUVI.yuv" -pix_fmt rgb24 -y resized_960x540_yuv420pUVI.png && sxiv resized_960x540_yuv420pUVI.png
 #nvprof ${debugger} ./test-module-nvidia-converter${debug_flag} 
 #${debugger} ./test-opengl${debug_flag}

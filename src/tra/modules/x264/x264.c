@@ -28,17 +28,14 @@
 #include <stdint.h>
 #include <x264.h>
 
-#include <tra/modules/x264/x264.h>
 #include <tra/registry.h>
 #include <tra/module.h>
 #include <tra/types.h>
-#include <tra/easy.h>
 #include <tra/log.h>
 
 /* ------------------------------------------------------- */
 
 static tra_encoder_api encoder_api;
-static tra_easy_api easy_api;
 
 /* ------------------------------------------------------- */
 
@@ -65,13 +62,6 @@ static int encoder_create(tra_encoder_settings* cfg, void* settings, tra_encoder
 static int encoder_destroy(tra_encoder_object* obj);
 static int encoder_encode(tra_encoder_object* obj, tra_sample* sample, uint32_t type, void* data);
 static int encoder_flush(tra_encoder_object* obj);
-
-/* ------------------------------------------------------- */
-
-static int easy_encoder_create(tra_easy* ez, tra_encoder_settings* cfg, void** enc);
-static int easy_encoder_encode(void* enc, tra_sample* sample, uint32_t type, void* data);
-static int easy_encoder_flush(void* enc);
-static int easy_encoder_destroy(void* enc);
 
 /* ------------------------------------------------------- */
 
@@ -112,20 +102,12 @@ static int encoder_create(
   tra_encoder_object** obj
 )
 {
-  tra_x264_settings* mod_cfg = NULL;
-  const char* cfg_preset = "ultrafast";
-  const char* cfg_profile = "baseline";
-  const char* cfg_tune = "zerolatency";
   x264_param_t param = { 0 };
   uint32_t img_fmt_cfg = 0;
   uint32_t img_fmt_x264 = 0;
   encoder* inst = NULL;
   int result = 0;
   int r = 0;
-
-  /* ----------------------------------------------- */
-  /* Validate                                        */
-  /* ----------------------------------------------- */
 
   if (NULL == obj) {
     TRAE("Cannot create the `x264enc` instance because the  given `tra_encoder_object**` is NULL.");
@@ -170,10 +152,6 @@ static int encoder_create(
     r = -100;
     goto error;
   }
-
-  /* ----------------------------------------------- */
-  /* Create                                          */
-  /* ----------------------------------------------- */
   
   inst = calloc(1, sizeof(encoder));
   if (NULL == inst) {
@@ -183,43 +161,15 @@ static int encoder_create(
   }
 
   inst->settings = *cfg;
-
-  /* Allow the user to override our defaults. */
-  mod_cfg = (tra_x264_settings*) settings;
-  if (NULL != mod_cfg) {
-
-    if (NULL != mod_cfg->preset) {
-      cfg_preset = mod_cfg->preset;
-    }
-    
-    if (NULL != mod_cfg->profile) {
-      cfg_profile = mod_cfg->profile;
-    }
-
-    if (NULL != mod_cfg->tune) {
-      cfg_tune = mod_cfg->tune;
-    }
-  }
   
   /* Load default params. */
-  r = x264_param_default_preset(&param, cfg_preset, cfg_tune);
+  r = x264_param_default_preset(&param, "medium", NULL);
   if (r < 0) {
     TRAE("Cannot create the `x264enc` instance because we failed to create the default preset.");
     r = -120;
     goto error;
   }
 
-  /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-  /*
-    IMPORRTANT: all the settings below should
-    be configurable. Do not assume that these
-    hardcoded values will stay the same. In the
-    future we'll allow the user to have fine
-    grained control over the encoder
-    settings.
-  */
-  /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-  
   /* Configure non-default params. */
   param.i_bitdepth = 8;
   param.i_csp = img_fmt_x264;
@@ -227,11 +177,10 @@ static int encoder_create(
   param.i_height = cfg->image_height;
   param.b_vfr_input = 0;
   param.b_repeat_headers = 1;
-  param.b_annexb = 0;
-  param.i_keyint_max = 25;
+  param.b_annexb = 1;
 
   /* Apply profile restrictions. */
-  r = x264_param_apply_profile(&param, cfg_profile);
+  r = x264_param_apply_profile(&param, "high");
   if (r < 0) {
     TRAE("Cannot create the `x264enc` instance because we failed to apply the profile restrictions.");
     r = -130;
@@ -244,7 +193,7 @@ static int encoder_create(
 
   inst->pic_in.img.i_csp = img_fmt_x264;
   inst->pic_in.img.i_plane = 2;
-  
+
   inst->handle = x264_encoder_open(&param);
   if (NULL == inst->handle) {
     TRAE("Cannot create the `x264enc` instance because we failed to open the x264 encoder.");
@@ -348,8 +297,7 @@ static int encoder_encode(tra_encoder_object* obj, tra_sample* sample, uint32_t 
   
   input_image = (tra_memory_image*) data;
   if (TRA_IMAGE_FORMAT_I420 != input_image->image_format
-      && TRA_IMAGE_FORMAT_NV12 != input_image->image_format
-      && TRA_IMAGE_FORMAT_YUYV != input_image->image_format)
+      && TRA_IMAGE_FORMAT_NV12 != input_image->image_format)
     {
       TRAE("Cannot encode using x264, unsupported format.");
       return -5;
@@ -396,7 +344,7 @@ static int encoder_encode(tra_encoder_object* obj, tra_sample* sample, uint32_t 
   }
 
   if (frame_size > 0) {
-
+    
     encoded_data.size = frame_size;
     encoded_data.data = nal_ptrs->p_payload;
     
@@ -420,68 +368,6 @@ static int encoder_flush(tra_encoder_object* obj) {
 
  error:
   return r;
-}
-
-/* ------------------------------------------------------- */
-
-static int easy_encoder_create(tra_easy* ez, tra_encoder_settings* cfg, void** enc) {
-
-  tra_encoder_object* inst = NULL;
-  int r = 0;
-  
-  if (NULL == enc) {
-    TRAE("Cannot create the x264 easy encoder as the given output argument is NULL.");
-    r = -10;
-    goto error;
-  }
-
-  r = encoder_create(cfg, NULL, &inst);
-  if (r < 0) {
-    TRAE("Failed to create the x264 easy encoder.");
-    r = -20;
-    goto error;
-  }
-
-  /* Assign */
-  *enc = inst;
-  
- error:
-  
-  if (r < 0) {
-    
-    if (NULL != inst) {
-      encoder_destroy(inst);
-      inst = NULL;
-    }
-
-    if (NULL != enc) {
-      *enc = NULL;
-    }
-  }
-  
-  return r;
-}
-
-/* ------------------------------------------------------- */
-
-static int easy_encoder_encode(void* enc, tra_sample* sample, uint32_t type, void* data) {
-  return encoder_encode(enc, sample, type, data);
-}
-
-/* ------------------------------------------------------- */
-
-static int easy_encoder_flush(void* enc) {
-
-  int r = 0;
-
- error:
-  return r;
-}
-
-/* ------------------------------------------------------- */
-
-static int easy_encoder_destroy(void* enc) {
-  return encoder_destroy(enc);
 }
 
 /* ------------------------------------------------------- */
@@ -510,10 +396,6 @@ static int encoder_map_image_format(uint32_t inFormat, uint32_t* outFormat) {
       return 0;
     }
 
-    case TRA_IMAGE_FORMAT_YUYV: {
-      *outFormat = X264_CSP_YUYV;
-      return 0;
-    }
   };
 
   TRAE("Cannot map the input format to a X264 format, the unhandled ");
@@ -533,15 +415,10 @@ int tra_load(tra_registry* reg) {
   int r = 0;
   
   r = tra_registry_add_encoder_api(reg, &encoder_api);
-  if (r < 0) {
-    TRAE("Failed to register the `x264` encoder.");
-    return -1;
-  }
 
-  r = tra_registry_add_easy_api(reg, &easy_api);
   if (r < 0) {
-    TRAE("Failed to register the `x264` easy encoder.");
-    return -30;
+    TRAE("Failed to register the x264 encoder.");
+    return -1;
   }
 
   TRAI("Registered the `x264enc` plugin.");
@@ -562,17 +439,3 @@ static tra_encoder_api encoder_api = {
 
 /* ------------------------------------------------------- */
 
-static tra_easy_api easy_api = {
-  .get_name = encoder_get_name,
-  .get_author = encoder_get_author,
-  .encoder_create = easy_encoder_create,
-  .encoder_encode = easy_encoder_encode,
-  .encoder_flush = easy_encoder_flush,
-  .encoder_destroy = easy_encoder_destroy,
-  .decoder_create = NULL,
-  .decoder_decode = NULL,
-  .decoder_destroy = NULL,
-};
-
-/* ------------------------------------------------------- */
-  

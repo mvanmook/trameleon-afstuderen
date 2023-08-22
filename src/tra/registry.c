@@ -227,6 +227,50 @@ int tra_registry_get_decoder_api(tra_registry* reg, const char* name, tra_decode
 
 /* ------------------------------------------------------- */
 
+int tra_registry_get_decoder_api_by_index(tra_registry* reg, int index, tra_decoder_api** result) {
+
+  tra_decoder_api* api = NULL;
+  uint32_t i = 0;
+  int r = 0;
+
+  if (NULL == reg) {
+    TRAE("Cannot get the decoder api, given `tra_registry` is NULL.");
+    return -10;
+  }
+
+  if (0 > index) {
+    TRAE("Cannot get the decoder api, index is negative.");
+    return -20;
+  }
+
+  if(reg->num_decoder_apis <= index){//this is the only way to know if the end is reached
+    return -30;
+  }
+
+  if (NULL == result) {
+    TRAE("Cannot get the decoder api, given result `tra_decoder_api**` is NULL.");
+    return -40;
+  }
+
+  if (NULL != (*result)) {
+    TRAE("Cannot get the decoder api, given result `*tra_decoder_api**` is NOT NULL. Did you initialize your variable to NULL?");
+    return -50;
+  }
+
+  api = reg->decoder_apis[index];
+
+  if (0 == r) {
+      *result = api;
+      return 0;
+    }
+
+  TRAE("Cannot get the decoder API at `%d`. We didn't find an decoder API with that index.", index);
+
+  return -60;
+}
+
+/* ------------------------------------------------------- */
+
 int tra_registry_print_decoder_apis(tra_registry* reg) {
 
   uint32_t i = 0;
@@ -360,6 +404,50 @@ int tra_registry_get_encoder_api(tra_registry* reg, const char* name, tra_encode
 
   TRAE("Cannot get the encoder API `%s`. We didn't find an encoder API with that name.", name);
   
+  return -60;
+}
+
+/* ------------------------------------------------------- */
+
+int tra_registry_get_encoder_api_by_index(tra_registry* reg, int index, tra_encoder_api** result) {
+
+  tra_encoder_api* api = NULL;
+  uint32_t i = 0;
+  int r = 0;
+
+  if (NULL == reg) {
+    TRAE("Cannot get the encoder api, given `tra_registry` is NULL.");
+    return -10;
+  }
+
+  if (0 > index) {
+    TRAE("Cannot get the encoder api, index is negative.");
+    return -20;
+  }
+
+  if(reg->num_encoder_apis <= index){//this is the only way to know if the end is reached
+    return -30;
+  }
+
+  if (NULL == result) {
+    TRAE("Cannot get the encoder api, given result `tra_encoder_api**` is NULL.");
+    return -40;
+  }
+
+  if (NULL != (*result)) {
+    TRAE("Cannot get the encoder api, given result `*tra_encoder_api**` is NOT NULL. Did you initialize your variable to NULL?");
+    return -50;
+  }
+
+  api = reg->encoder_apis[index];
+
+  if (0 == r) {
+    *result = api;
+    return 0;
+  }
+
+  TRAE("Cannot get the encoder API at `%d`. We didn't find an encoder API with that index.", index);
+
   return -60;
 }
 
@@ -985,12 +1073,11 @@ static int registry_load_modules(tra_registry* reg) {
   BOOL find_next = FALSE;
   char path[1024] = { 0 };
   int r = 0;
-  
-  TRAE("@todo implement registry_load_modules on Windows.");
+
 
   find_handle = FindFirstFile("./../lib/*.dll", &find_data);
   if (INVALID_HANDLE_VALUE == find_handle) {
-    TRAE("Cannot load moduels, failed to open a find handle to the `./../lib/` dir.");
+    TRAE("Cannot load modules, failed to open a find handle to the `./../lib/` dir.");
     r = -10;
     goto error;
   }
@@ -1017,6 +1104,13 @@ static int registry_load_modules(tra_registry* reg) {
     find_next = FindNextFile(find_handle, &find_data);
     
   } while (TRUE == find_next);
+
+  //checks if all modules are loaded
+  if(ERROR_NO_MORE_FILES != GetLastError()){
+    r = -40;
+    TRAE("Failed to read module data.");
+    goto error;
+  }
            
  error:
 

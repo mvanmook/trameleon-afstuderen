@@ -145,14 +145,14 @@ int tra_encoder_destroy(tra_encoder* enc) {
 
 /* ------------------------------------------------------- */
 
-int tra_encoder_encode(tra_encoder* enc, tra_sample* sample, uint32_t type, void* data) {
+int tra_encoder_encode(tra_encoder* enc, uint32_t type, void* data) {
 
   if (NULL == enc) {
     TRAE("Cannot encode a video frame. The `api` member of the `tra_encoder*` is NULL.");
     return -10;
   }
 
-  return enc->api->encode(enc->obj, sample, type, data);
+  return enc->api->encode(enc->obj, type, data);
 }
 
 /* ------------------------------------------------------- */

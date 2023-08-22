@@ -16,6 +16,10 @@ set(mod_dir "${base_dir}/src/tra/modules")
 
 # -----------------------------------------------------------------
 
+include(${curr_dir}/deps/trameleon.cmake)
+
+# -----------------------------------------------------------------
+
 option(TRA_BUILD_STATIC_LIB "Build a static library. This means you need to initialize the modules manually." OFF)
 
 # -----------------------------------------------------------------
@@ -27,39 +31,76 @@ endif()
 
 # -----------------------------------------------------------------
 
-include(${curr_dir}/deps/glfw.cmake)
-include(${curr_dir}/deps/tracy.cmake) # experimenting ..
-include(${curr_dir}/deps/ffmpeg.cmake)
-include(${curr_dir}/deps/glad.cmake)
+include(${deps_dir}/glfw.cmake)
+include(${deps_dir}/tracy.cmake) # experimenting ..
+include(${deps_dir}/ffmpeg.cmake)
+include(${deps_dir}/x264.cmake)
+include(${deps_dir}/glad.cmake)
 
 # -----------------------------------------------------------------
 
-include(${curr_dir}/deps/trameleon.cmake)
-include(${curr_dir}/deps/trameleon-core.cmake)
-include(${curr_dir}/deps/trameleon-dev.cmake)
-include(${curr_dir}/deps/trameleon-nvidia.cmake)
-include(${curr_dir}/deps/trameleon-x264.cmake)
-include(${curr_dir}/deps/trameleon-vaapi.cmake)
-include(${curr_dir}/deps/trameleon-opengl.cmake)
+if (WIN32)
+#  include(${deps_dir}/opengl.cmake)
+  include(${deps_dir}/mft.cmake)
+endif()
 
-#include(${curr_dir}/deps/trameleon-netint.cmake)
-#include(${curr_dir}/deps/trameleon-mft.cmake)
-#include(${curr_dir}/deps/trameleon-vtbox.cmake)
+if (UNIX)
+  include(${deps_dir}/nvidia.cmake)
+  #include(${deps_dir}/vtbox.cmake)
+  include(${deps_dir}/opengl.cmake)
+  include(${deps_dir}/vaapi.cmake)
+  #include(${deps_dir}/netint.cmake)
+endif()
+
+# -----------------------------------------------------------------
+
+if (UNIX)
+  add_definitions(-DTRA_PROFILER_ENABLED)
+endif()
 
 # -----------------------------------------------------------------
 
-add_definitions(-DTRA_PROFILER_ENABLED)
+list(APPEND tra_inc_dirs
+  ${inc_dir}
+  ${rxtx_dir}/include
+  )
 
 # -----------------------------------------------------------------
+
+list(APPEND tra_sources
+  ${src_dir}/tra/buffer.c
+  ${src_dir}/tra/log.c
+  ${src_dir}/tra/core.c
+  ${src_dir}/tra/registry.c
+  ${src_dir}/tra/module.c
+  ${src_dir}/tra/utils.c
+  ${src_dir}/tra/dict.c
+  ${src_dir}/tra/golomb.c
+  ${src_dir}/tra/avc.c
+  ${src_dir}/tra/types.c
+  ${src_dir}/tra/time.c
+  ${src_dir}/tra/profiler.c
+  ${src_dir}/tra/easy.c
+  ${src_dir}/tra/modules/easy/easy-encoder.c
+  ${src_dir}/tra/modules/easy/easy-decoder.c
+  ${src_dir}/tra/modules/easy/easy-transcoder.c
+  ${src_dir}/dev/generator.c
+#  ${rxtx_dir}/src/log.c
+#  ${rxtx_dir}/src/time.c
+#  ${rxtx_dir}/src/threads.c
+#  ${rxtx_dir}/src/utils.c
+#  ${rxtx_dir}/src/trace.c
+)
 
 tra_add_library(
   NAME tra
   SOURCES ${tra_sources}
   DEPS ${tra_deps}
-  )
+#  LIBS ${tar_libs}
+)
 
 # -----------------------------------------------------------------
-  
+
 if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
 else()
   target_compile_options(
@@ -94,9 +135,9 @@ tra_create_test(NAME "compile")
 #tra_create_test(NAME "profiler") # uses RXTX (commented for Maarten)
 #tra_create_test(NAME "registry")
 #tra_create_test(NAME "modules")
-tra_create_test(NAME "module-x264-encoder")
+#tra_create_test(NAME "module-x264-encoder")
 #tra_create_test(NAME "opengl" LIBS "cuda")
-tra_create_test(NAME "opengl-converter")
+#tra_create_test(NAME "opengl-converter")
 tra_create_test(NAME "easy-encoder")
 tra_create_test(NAME "easy-decoder")
 tra_create_test(NAME "easy-transcoder")

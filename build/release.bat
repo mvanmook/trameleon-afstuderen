@@ -86,6 +86,7 @@ cmake -G "%cmake_generator%" ^
       -DCMAKE_VERBOSE_MAKEFILE=ON ^
       -DROXLU_RXTX_DIR="./../../../2022-programming/roxlu-rxtx/" ^
       -DTRA_BUILD_STATIC_LIB=OFF ^
+      -DTRA_FORCE_REBUILD=OFF ^
       ..
 
 echo Done
@@ -108,7 +109,7 @@ cd bin
 
 :: ----------------------------------------------------
 rem test-log.exe
-rem %debugger% test-module-mft-encoder%debug_flag%.exe
+%debugger% test-module-mft-encoder%debug_flag%.exe
 %debugger% test-module-mft-decoder%debug_flag%.exe
 rem %debugger% test-debug%debug_flag%.exe
 :: ----------------------------------------------------

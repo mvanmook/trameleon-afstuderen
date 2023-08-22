@@ -1,9 +1,7 @@
 /* ------------------------------------------------------- */
 
-#define GL_GLEXT_PROTOTYPES
-#include <GL/glcorearb.h>
-
 #include <stdlib.h>
+#include <glad/gl.h>
 #include <cuda.h>
 #include <cudaGL.h>
 #include <tra/modules/opengl/opengl-gfx.h>

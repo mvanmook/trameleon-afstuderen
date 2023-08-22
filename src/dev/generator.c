@@ -184,6 +184,7 @@ int dev_generator_create(
   inst->codec_ctx->pix_fmt = AV_PIX_FMT_NV12;
   inst->codec_ctx->time_base = (AVRational){1, 25};
   inst->codec_ctx->framerate = (AVRational){25, 1};
+  inst->codec_ctx->profile = FF_PROFILE_H264_BASELINE;
 
   r = avcodec_open2(inst->codec_ctx, inst->codec_inst, NULL);
   if (r < 0) {
@@ -401,7 +402,7 @@ static int encode_frame(dev_generator* ctx) {
     }
 
     if (AVERROR_EOF == r) {
-      TRAI("Encoder returned EOF");
+      TRAI("Encoder returned OEF");
       r = 0;
       break;
     }

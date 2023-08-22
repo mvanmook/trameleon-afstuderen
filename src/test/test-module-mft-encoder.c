@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <libavfilter/buffersink.h>
 #include <libavfilter/avfilter.h>
@@ -46,7 +47,6 @@ static int on_encoded_data(uint32_t type, void* data, void* user);
 /* ------------------------------------------------------- */
 
 int main(int argc, const char* argv[]) {
-
   AVFilterContext* filter_sink = NULL;
   AVFilterInOut* filter_inputs = NULL;
   AVFilterInOut* filter_outputs = NULL;
@@ -80,7 +80,7 @@ int main(int argc, const char* argv[]) {
 
   r = avfilter_graph_parse2(
     graph,
-    "testsrc@roxlu=duration=1:size=1280x720,format=pix_fmts=nv12,buffersink@roxlu",
+    "testsrc@roxlu=duration=10:size=3840x2160,format=pix_fmts=nv12,fps=60,buffersink@roxlu",
     &filter_inputs,
     &filter_outputs
   );
@@ -131,20 +131,27 @@ int main(int argc, const char* argv[]) {
   
   r = tra_core_create(&core_cfg, &core);
   if (r < 0) {
+    TRAE("failed to create core");
     r = -60;
     goto error;
   }
 
   enc_opt.image_width = image_width;
   enc_opt.image_height = image_height;
-  enc_opt.image_format = TRA_IMAGE_FORMAT_NV12;
+  enc_opt.input_format = TRA_IMAGE_FORMAT_NV12;
+  enc_opt.output_format = TRA_IMAGE_FORMAT_H264;
+  enc_opt.profile = TRA_Profile_H264_HIGH;
   enc_opt.callbacks.on_encoded_data = on_encoded_data;
   enc_opt.callbacks.user = fp;
+  enc_opt.bitrate = 700e3;
+  enc_opt.fps_num = 60;
+  enc_opt.fps_den = 1;
 
   r = tra_core_encoder_create(core, "mftenc", &enc_opt, NULL, &enc);
   
   if (r < 0) {
     r = -80;
+    TRAE("failed to create encoder");
     goto error;
   }
 
@@ -158,18 +165,20 @@ int main(int argc, const char* argv[]) {
     
     r = av_buffersink_get_frame(filter_sink, frame);
     if (AVERROR(EAGAIN) == r) {
+      r = 0;
       break;
     }
 
     if (AVERROR_EOF == r) {
-      TRAI("Ready with encoding.");
+      TRAI("Done with encoding.");
+      r = 0;
       break;
     }
 
     /* Setup the data we pass into the encoder. */
     img.image_width = frame->width;
     img.image_height = frame->height;
-    img.image_format = enc_opt.image_format;
+    img.image_format = enc_opt.input_format;
 
     img.plane_count = 2;
     
@@ -187,11 +196,17 @@ int main(int argc, const char* argv[]) {
 
     sample.pts = frame->pts;
 
-    r = tra_encoder_encode(enc, &sample, TRA_MEMORY_TYPE_IMAGE, &img);
+    r = tra_encoder_encode(enc, TRA_MEMORY_TYPE_IMAGE, &img);
     if (r < 0) {
       TRAE("Failed to encode.");
       break;
     }
+  }
+
+  r = tra_encoder_flush(enc);
+  if(0 > r){
+    TRAE("Failed to flush.");
+    goto error;
   }
   
  error:
@@ -224,19 +239,20 @@ int main(int argc, const char* argv[]) {
   if (r < 0) {
     return EXIT_FAILURE;
   }
-    
+
+
+
   return EXIT_SUCCESS;
 }
 
 /* ------------------------------------------------------- */
 
 static int on_encoded_data(uint32_t type, void* data, void* user) {
-
-  tra_encoded_host_memory* encoded = (tra_encoded_host_memory*) data;
+  tra_memory_h264 * encoded = (tra_memory_h264 *) data;
   FILE* fp = (FILE*) user;
   int r = 0;
   
-  if (TRA_MEMORY_TYPE_HOST_H264 != type) {
+  if (TRA_MEMORY_TYPE_H264 != type) {
     TRAE("Cannot handle encoded data, unsupported type: %u. (exiting)", type);
     exit(EXIT_FAILURE);
   }

@@ -91,10 +91,12 @@ TRA_LIB_DLL int tra_registry_print_apis(tra_registry* reg);
 
 TRA_LIB_DLL int tra_registry_add_decoder_api(tra_registry* reg, tra_decoder_api* api);
 TRA_LIB_DLL int tra_registry_get_decoder_api(tra_registry* reg, const char* name, tra_decoder_api** result);
+TRA_LIB_DLL int tra_registry_get_decoder_api_by_index(tra_registry* reg, int index, tra_decoder_api** result);
 TRA_LIB_DLL int tra_registry_print_decoder_apis(tra_registry* reg);
 
 TRA_LIB_DLL int tra_registry_add_encoder_api(tra_registry* reg, tra_encoder_api* api);
 TRA_LIB_DLL int tra_registry_get_encoder_api(tra_registry* reg, const char* name, tra_encoder_api** result);
+TRA_LIB_DLL int tra_registry_get_encoder_api_by_index(tra_registry* reg, int index, tra_encoder_api** result);
 TRA_LIB_DLL int tra_registry_print_encoder_apis(tra_registry* reg);
 
 TRA_LIB_DLL int tra_registry_add_graphics_api(tra_registry* reg, tra_graphics_api* api);

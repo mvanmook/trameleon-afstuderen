@@ -1,245 +1,237 @@
-/* ------------------------------------------------------- */
+#include "tra/modules/mft/MediaFoundationUtils.h"
+#include "tra/types.h"
 
-#include <tra/modules/mft/MediaFoundationUtils.h>
+int convert_trameleon_to_mft_hardAcc(GUID &hardAcc, uint32_t type) {
+  switch (type) {
 
-extern "C" {
-#  include <tra/types.h>
-#  include <tra/log.h>  
+  case TRA_IMAGE_FORMAT_H264: hardAcc = CODECAPI_AVDecVideoAcceleration_H264; return 0;
+  // case TRA_IMAGE_FORMAT_ : hardAcc = CODECAPI_AVDecVideoAcceleration_MPEG2; return 0; @TODO figure out this conversion
+  case TRA_IMAGE_FORMAT_WVC1: hardAcc = CODECAPI_AVDecVideoAcceleration_VC1; return 0;
+
+  default: return -1;
+  }
 }
 
-/* ------------------------------------------------------- */
+int convert_trameleon_to_mft_image_format(uint32_t type, GUID &image_format) {
+  switch (type) {
+  case TRA_IMAGE_FORMAT_H264: image_format = MFVideoFormat_H264; return 0;
+  case TRA_IMAGE_FORMAT_I420: image_format = MFVideoFormat_I420; return 0;
+  case TRA_IMAGE_FORMAT_YV12: image_format = MFVideoFormat_YV12; return 0;
+  case TRA_IMAGE_FORMAT_NV12: image_format = MFVideoFormat_NV12; return 0;
+  case TRA_IMAGE_FORMAT_UYVY: image_format = MFVideoFormat_UYVY; return 0;
+  case TRA_IMAGE_FORMAT_V210: image_format = MFVideoFormat_v210; return 0;
+  case TRA_IMAGE_FORMAT_AI44: image_format = MFVideoFormat_AI44; return 0;
+  case TRA_IMAGE_FORMAT_AYUV: image_format = MFVideoFormat_AYUV; return 0;
+  case TRA_IMAGE_FORMAT_YUY2: image_format = MFVideoFormat_YUY2; return 0;
+  case TRA_IMAGE_FORMAT_YVYU: image_format = MFVideoFormat_YVYU; return 0;
+  case TRA_IMAGE_FORMAT_YVU9: image_format = MFVideoFormat_YVU9; return 0;
+  case TRA_IMAGE_FORMAT_NV11: image_format = MFVideoFormat_NV11; return 0;
+  case TRA_IMAGE_FORMAT_IYUV: image_format = MFVideoFormat_IYUV; return 0;
+  case TRA_IMAGE_FORMAT_Y210: image_format = MFVideoFormat_Y210; return 0;
+  case TRA_IMAGE_FORMAT_Y216: image_format = MFVideoFormat_Y216; return 0;
+  case TRA_IMAGE_FORMAT_Y410: image_format = MFVideoFormat_Y410; return 0;
+  case TRA_IMAGE_FORMAT_Y416: image_format = MFVideoFormat_Y416; return 0;
+  case TRA_IMAGE_FORMAT_Y41P: image_format = MFVideoFormat_Y41P; return 0;
+  case TRA_IMAGE_FORMAT_Y41T: image_format = MFVideoFormat_Y41T; return 0;
+  case TRA_IMAGE_FORMAT_Y42T: image_format = MFVideoFormat_Y42T; return 0;
+  case TRA_IMAGE_FORMAT_P210: image_format = MFVideoFormat_P210; return 0;
+  case TRA_IMAGE_FORMAT_P010: image_format = MFVideoFormat_P010; return 0;
+  case TRA_IMAGE_FORMAT_P016: image_format = MFVideoFormat_P016; return 0;
+  case TRA_IMAGE_FORMAT_v216: image_format = MFVideoFormat_v216; return 0;
+  case TRA_IMAGE_FORMAT_v410: image_format = MFVideoFormat_v410; return 0;
+  case TRA_IMAGE_FORMAT_MP43: image_format = MFVideoFormat_MP43; return 0;
+  case TRA_IMAGE_FORMAT_MP4S: image_format = MFVideoFormat_MP4S; return 0;
+  case TRA_IMAGE_FORMAT_M4S2: image_format = MFVideoFormat_M4S2; return 0;
+  case TRA_IMAGE_FORMAT_MP4V: image_format = MFVideoFormat_MP4V; return 0;
+  case TRA_IMAGE_FORMAT_WMV1: image_format = MFVideoFormat_WMV1; return 0;
+  case TRA_IMAGE_FORMAT_WMV2: image_format = MFVideoFormat_WMV2; return 0;
+  case TRA_IMAGE_FORMAT_WMV3: image_format = MFVideoFormat_WMV3; return 0;
+  case TRA_IMAGE_FORMAT_WVC1: image_format = MFVideoFormat_WVC1; return 0;
+  case TRA_IMAGE_FORMAT_MSS1: image_format = MFVideoFormat_MSS1; return 0;
+  case TRA_IMAGE_FORMAT_MSS2: image_format = MFVideoFormat_MSS2; return 0;
+  case TRA_IMAGE_FORMAT_MPG1: image_format = MFVideoFormat_MPG1; return 0;
+  case TRA_IMAGE_FORMAT_DVSL: image_format = MFVideoFormat_DVSL; return 0;
+  case TRA_IMAGE_FORMAT_DVSD: image_format = MFVideoFormat_DVSD; return 0;
+  case TRA_IMAGE_FORMAT_DVHD: image_format = MFVideoFormat_DVHD; return 0;
+  case TRA_IMAGE_FORMAT_DV25: image_format = MFVideoFormat_DV25; return 0;
+  case TRA_IMAGE_FORMAT_DV50: image_format = MFVideoFormat_DV50; return 0;
+  case TRA_IMAGE_FORMAT_DVH1: image_format = MFVideoFormat_DVH1; return 0;
+  case TRA_IMAGE_FORMAT_DVC: image_format = MFVideoFormat_DVC; return 0;
+  case TRA_IMAGE_FORMAT_H265: image_format = MFVideoFormat_H265; return 0;
+  case TRA_IMAGE_FORMAT_MJPG: image_format = MFVideoFormat_MJPG; return 0;
+  case TRA_IMAGE_FORMAT_4200: image_format = MFVideoFormat_420O; return 0;
+  case TRA_IMAGE_FORMAT_HEVC: image_format = MFVideoFormat_HEVC; return 0;
+  case TRA_IMAGE_FORMAT_HEVC_ES: image_format = MFVideoFormat_HEVC_ES; return 0;
+  case TRA_IMAGE_FORMAT_VP80: image_format = MFVideoFormat_VP80; return 0;
+  case TRA_IMAGE_FORMAT_VP90: image_format = MFVideoFormat_VP90; return 0;
+  default: return -1;
+  }
+}
 
-int mft_videoformat_to_imageformat(GUID fmt, uint32_t* outFormat) {
+int convert_trameleon_to_mft_profile(uint32_t &profile, uint32_t type) {
+  switch (type) {
+  case TRA_Profile_H264_BASE: profile = eAVEncH264VProfile_Base; return 0;
+  case TRA_Profile_H264_MAIN: profile = eAVEncH264VProfile_Main; return 0;
+  case TRA_Profile_H264_HIGH: profile = eAVEncH264VProfile_High; return 0;
+  case TRA_Profile_H264_H10: profile = eAVEncH264VProfile_High10; return 0;
+  case TRA_Profile_H264_H422: profile = eAVEncH264VProfile_422; return 0;
+  case TRA_Profile_H264_H444: profile = eAVEncH264VProfile_444; return 0;
+  default: return -1;
+  }
+}
 
-  if (NULL == outFormat) {
-    TRAE("Cannot convert the MFTVideoFormat GUID into a image format because the given `outFormat` is NULL.");
+int convert_mft_to_trameleon_image_format(GUID &image_format, uint32_t &type) {
+  if (MFVideoFormat_H264 == image_format) {
+    type = TRA_IMAGE_FORMAT_H264;
+    return 0;
+  } else if (MFVideoFormat_I420 == image_format) {
+    type = TRA_IMAGE_FORMAT_I420;
+    return 0;
+  } else if (MFVideoFormat_YV12 == image_format) {
+    type = TRA_IMAGE_FORMAT_YV12;
+    return 0;
+  } else if (MFVideoFormat_NV12 == image_format) {
+    type = TRA_IMAGE_FORMAT_NV12;
+    return 0;
+  } else if (MFVideoFormat_UYVY == image_format) {
+    type = TRA_IMAGE_FORMAT_UYVY;
+    return 0;
+  } else if (MFVideoFormat_v210 == image_format) {
+    type = TRA_IMAGE_FORMAT_V210;
+    return 0;
+  } else if (MFVideoFormat_AI44 == image_format) {
+    type = TRA_IMAGE_FORMAT_AI44;
+    return 0;
+  } else if (MFVideoFormat_AYUV == image_format) {
+    type = TRA_IMAGE_FORMAT_AYUV;
+    return 0;
+  } else if (MFVideoFormat_YUY2 == image_format) {
+    type = TRA_IMAGE_FORMAT_YUY2;
+    return 0;
+  } else if (MFVideoFormat_YVYU == image_format) {
+    type = TRA_IMAGE_FORMAT_YVYU;
+    return 0;
+  } else if (MFVideoFormat_YVU9 == image_format) {
+    type = TRA_IMAGE_FORMAT_YVU9;
+    return 0;
+  } else if (MFVideoFormat_NV11 == image_format) {
+    type = TRA_IMAGE_FORMAT_NV11;
+    return 0;
+  } else if (MFVideoFormat_IYUV == image_format) {
+    type = TRA_IMAGE_FORMAT_IYUV;
+    return 0;
+  } else if (MFVideoFormat_Y210 == image_format) {
+    type = TRA_IMAGE_FORMAT_Y210;
+    return 0;
+  } else if (MFVideoFormat_Y216 == image_format) {
+    type = TRA_IMAGE_FORMAT_Y216;
+    return 0;
+  } else if (MFVideoFormat_Y410 == image_format) {
+    type = TRA_IMAGE_FORMAT_Y410;
+    return 0;
+  } else if (MFVideoFormat_Y416 == image_format) {
+    type = TRA_IMAGE_FORMAT_Y416;
+    return 0;
+  } else if (MFVideoFormat_Y41P == image_format) {
+    type = TRA_IMAGE_FORMAT_Y41P;
+    return 0;
+  } else if (MFVideoFormat_Y41T == image_format) {
+    type = TRA_IMAGE_FORMAT_Y41T;
+    return 0;
+  } else if (MFVideoFormat_Y42T == image_format) {
+    type = TRA_IMAGE_FORMAT_Y42T;
+    return 0;
+  } else if (MFVideoFormat_P210 == image_format) {
+    type = TRA_IMAGE_FORMAT_P210;
+    return 0;
+  } else if (MFVideoFormat_P010 == image_format) {
+    type = TRA_IMAGE_FORMAT_P010;
+    return 0;
+  } else if (MFVideoFormat_P016 == image_format) {
+    type = TRA_IMAGE_FORMAT_P016;
+    return 0;
+  } else if (MFVideoFormat_v216 == image_format) {
+    type = TRA_IMAGE_FORMAT_v216;
+    return 0;
+  } else if (MFVideoFormat_v410 == image_format) {
+    type = TRA_IMAGE_FORMAT_v410;
+    return 0;
+  } else if (MFVideoFormat_MP43 == image_format) {
+    type = TRA_IMAGE_FORMAT_MP43;
+    return 0;
+  } else if (MFVideoFormat_MP4S == image_format) {
+    type = TRA_IMAGE_FORMAT_MP4S;
+    return 0;
+  } else if (MFVideoFormat_M4S2 == image_format) {
+    type = TRA_IMAGE_FORMAT_M4S2;
+    return 0;
+  } else if (MFVideoFormat_MP4V == image_format) {
+    type = TRA_IMAGE_FORMAT_MP4V;
+    return 0;
+  } else if (MFVideoFormat_WMV1 == image_format) {
+    type = TRA_IMAGE_FORMAT_WMV1;
+    return 0;
+  } else if (MFVideoFormat_WMV2 == image_format) {
+    type = TRA_IMAGE_FORMAT_WMV2;
+    return 0;
+  } else if (MFVideoFormat_WMV3 == image_format) {
+    type = TRA_IMAGE_FORMAT_WMV3;
+    return 0;
+  } else if (MFVideoFormat_WVC1 == image_format) {
+    type = TRA_IMAGE_FORMAT_WVC1;
+    return 0;
+  } else if (MFVideoFormat_MSS1 == image_format) {
+    type = TRA_IMAGE_FORMAT_MSS1;
+    return 0;
+  } else if (MFVideoFormat_MSS2 == image_format) {
+    type = TRA_IMAGE_FORMAT_MSS2;
+    return 0;
+  } else if (MFVideoFormat_MPG1 == image_format) {
+    type = TRA_IMAGE_FORMAT_MPG1;
+    return 0;
+  } else if (MFVideoFormat_DVSL == image_format) {
+    type = TRA_IMAGE_FORMAT_DVSL;
+    return 0;
+  } else if (MFVideoFormat_DVSD == image_format) {
+    type = TRA_IMAGE_FORMAT_DVSD;
+    return 0;
+  } else if (MFVideoFormat_DVHD == image_format) {
+    type = TRA_IMAGE_FORMAT_DVHD;
+    return 0;
+  } else if (MFVideoFormat_DV25 == image_format) {
+    type = TRA_IMAGE_FORMAT_DV25;
+    return 0;
+  } else if (MFVideoFormat_DV50 == image_format) {
+    type = TRA_IMAGE_FORMAT_DV50;
+    return 0;
+  } else if (MFVideoFormat_DVH1 == image_format) {
+    type = TRA_IMAGE_FORMAT_DVH1;
+    return 0;
+  } else if (MFVideoFormat_DVC == image_format) {
+    type = TRA_IMAGE_FORMAT_DVC;
+    return 0;
+  } else if (MFVideoFormat_H265 == image_format) {
+    type = TRA_IMAGE_FORMAT_H265;
+    return 0;
+  } else if (MFVideoFormat_MJPG == image_format) {
+    type = TRA_IMAGE_FORMAT_MJPG;
+    return 0;
+  } else if (MFVideoFormat_420O == image_format) {
+    type = TRA_IMAGE_FORMAT_4200;
+    return 0;
+  } else if (MFVideoFormat_HEVC == image_format) {
+    type = TRA_IMAGE_FORMAT_HEVC;
+    return 0;
+  } else if (MFVideoFormat_HEVC_ES == image_format) {
+    type = TRA_IMAGE_FORMAT_HEVC_ES;
+    return 0;
+  } else if (MFVideoFormat_VP80 == image_format) {
+    type = TRA_IMAGE_FORMAT_VP80;
+    return 0;
+  } else if (MFVideoFormat_VP90 == image_format) {
+    type = TRA_IMAGE_FORMAT_VP90;
+    return 0;
+  } else {
     return -1;
   }
-
-  if (MFVideoFormat_NV12 == fmt) {
-    *outFormat = TRA_IMAGE_FORMAT_NV12;
-    return 0;
-  }
-
-  TRAE("Unhandled video format; cannot convert into `TRA_IMAGE_FORMAT_*`.");
-  return -2;
 }
-
-/* ------------------------------------------------------- */
-
-/* Converts a Trameleon image format into a MFT format. */
-int mft_imageformat_to_videoformat(uint32_t imageFormat, GUID* outFormat) {
-
-  if (NULL == outFormat) {
-    TRAE("Cannot convert th egiven `imageFormat` into a MFTVideoFormat GUID as the given output GUID* is NULL.");
-    return -1;
-  }
-
-  switch (imageFormat) {
-    case TRA_IMAGE_FORMAT_NV12: {
-      *outFormat = MFVideoFormat_NV12;
-      return 0;
-    }
-  }
-
-  TRAE("Unhandled image format; cannot convert into a MFT format.");
-  return -2;
-}
-
-/* ------------------------------------------------------- */
-
-/* 
-   Prints some info about the given media type. This can be used 
-   to e.g. determine the default or preferred format for the
-   decoder. 
-*/
-int mft_print_mediatype(IMFMediaType* mt) {
-
-    uint32_t attr_stride = 0;
-    GUID attr_mt = { 0 };
-    GUID attr_st = { 0 };
-    HRESULT hr = S_OK;
-
-    if (NULL == mt) {
-      TRAE("Cannot print `IMFMediaType` as the given pointer is NULL.");
-      return -1;
-    }
-
-    hr = mt->GetGUID(MF_MT_MAJOR_TYPE, &attr_mt);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Failed to get the major type.");
-      return -2;
-    }
-
-    hr = mt->GetGUID(MF_MT_SUBTYPE, &attr_st);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Failed to get the sub type.");
-      return -3;
-    }
-
-    hr = mt->GetUINT32(MF_MT_DEFAULT_STRIDE, &attr_stride);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Failed to get teh stride.");
-      return -4;
-    }
-  
-    TRAD("IMFMediaType");
-    TRAD(" MF_MT_MAJOR_TYPE: %s", mft_videoformat_to_string(attr_mt));
-    TRAD(" MF_MT_SUBTYPE: %s", mft_videoformat_to_string(attr_st));
-    TRAD(" MF_MT_DEFAULT_STRIDE: %u", attr_stride);
-
-    return 0;
-  }
-
-/* ------------------------------------------------------- */
-
-#define MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(param, val) if (param == val) return #val
-
-const char* mft_videoformat_to_string(const GUID& guid) {
-
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MAJOR_TYPE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_SUBTYPE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_ALL_SAMPLES_INDEPENDENT);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_FIXED_SIZE_SAMPLES);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_COMPRESSED);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_SAMPLE_SIZE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_WRAPPED_TYPE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_NUM_CHANNELS);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_SAMPLES_PER_SECOND);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_FLOAT_SAMPLES_PER_SECOND);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_AVG_BYTES_PER_SECOND);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_BLOCK_ALIGNMENT);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_BITS_PER_SAMPLE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_VALID_BITS_PER_SAMPLE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_SAMPLES_PER_BLOCK);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_CHANNEL_MASK);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_FOLDDOWN_MATRIX);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_WMADRC_PEAKREF);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_WMADRC_PEAKTARGET);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_WMADRC_AVGREF);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_WMADRC_AVGTARGET);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AUDIO_PREFER_WAVEFORMATEX);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AAC_PAYLOAD_TYPE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_FRAME_SIZE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_FRAME_RATE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_FRAME_RATE_RANGE_MAX);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_FRAME_RATE_RANGE_MIN);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_PIXEL_ASPECT_RATIO);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DRM_FLAGS);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_PAD_CONTROL_FLAGS);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_SOURCE_CONTENT_HINT);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_VIDEO_CHROMA_SITING);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_INTERLACE_MODE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_TRANSFER_FUNCTION);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_VIDEO_PRIMARIES);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_CUSTOM_VIDEO_PRIMARIES);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_YUV_MATRIX);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_VIDEO_LIGHTING);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_VIDEO_NOMINAL_RANGE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_GEOMETRIC_APERTURE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MINIMUM_DISPLAY_APERTURE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_PAN_SCAN_APERTURE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_PAN_SCAN_ENABLED);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AVG_BITRATE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AVG_BIT_ERROR_RATE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MAX_KEYFRAME_SPACING);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DEFAULT_STRIDE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_PALETTE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_USER_DATA);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_AM_FORMAT_TYPE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG_START_TIME_CODE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG2_PROFILE);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG2_LEVEL);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG2_FLAGS);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG_SEQUENCE_HEADER);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DV_AAUX_SRC_PACK_0);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DV_AAUX_CTRL_PACK_0);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DV_AAUX_SRC_PACK_1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DV_AAUX_CTRL_PACK_1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DV_VAUX_SRC_PACK);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_DV_VAUX_CTRL_PACK);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_ARBITRARY_HEADER);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_ARBITRARY_FORMAT);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_IMAGE_LOSS_TOLERANT);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG4_SAMPLE_DESCRIPTION);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_MPEG4_CURRENT_SAMPLE_ENTRY);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_ORIGINAL_4CC);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MF_MT_ORIGINAL_WAVE_FORMAT_TAG);
-
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_Audio);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_Video);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_Protected);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_SAMI);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_Script);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_Image);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_HTML);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_Binary);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFMediaType_FileTransfer);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_AI44);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_ARGB32);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_AYUV);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_DV25);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_DV50);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_DVH1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_DVSD);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_DVSL);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_H264);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_I420);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_IYUV);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_M4S2);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MJPG);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MP43);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MP4S);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MP4V);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MPG1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MSS1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_MSS2);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_NV11);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_NV12);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_P010);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_P016);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_P210);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_P216);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_RGB24);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_RGB32);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_RGB555);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_RGB565);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_RGB8);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_UYVY);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_v210);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_v410);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_WMV1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_WMV2);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_WMV3);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_WVC1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_Y210);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_Y216);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_Y410);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_Y416);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_Y41P);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_Y41T);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_YUY2);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_YV12);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFVideoFormat_YVYU);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_PCM);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_Float);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_DTS);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_Dolby_AC3_SPDIF);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_DRM);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_WMAudioV8);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_WMAudioV9);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_WMAudio_Lossless);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_WMASPDIF);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_MSP1);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_MP3);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_MPEG);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_AAC);
-  MEDIAFOUNDATION_VIDEOFORMAT_TO_STR(guid, MFAudioFormat_ADTS);
-
-  return "UNKNOWN";
-}
-
-#undef MEDIAFOUNDATION_VIDEOFORMAT_TO_STR
-
-/* ------------------------------------------------------- */

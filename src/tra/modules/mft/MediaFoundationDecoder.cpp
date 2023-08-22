@@ -1,1069 +1,814 @@
-/* ------------------------------------------------------- */
 
-#include <string>
-
-#define WIN32_LEAN_AND_MEAN
-#include <Mfapi.h>         /* IMFMediaType */
-#include <wmcodecdsp.h>    /* CLSID_CMSH264DecoderMFT */
-#include <Mferror.h>       /* MF_E_*  */
-#include <Codecapi.h>      /* eAVEncH264VProfile_High */
-
-#include <tra/modules/mft/MediaFoundationDecoder.h>
-#include <tra/modules/mft/MediaFoundationUtils.h>
-
-extern "C" {
-#  include <tra/types.h>
-#  include <tra/log.h>
-}
+#include "tra/modules/mft/MediaFoundationDecoder.h"
+#include "tra/log.h"
+#include <mfapi.h>
+#include <mferror.h>
+#include <wmcodecdsp.h>
 
 namespace tra {
 
-  /* ------------------------------------------------------- */
+  int MediaFoundationDecoder::shutdown() {
+    sendStreamEndMessage();
 
-  static std::string get_last_error_as_string();
-  
-  /* ------------------------------------------------------- */
+    Release(&decoder_transform);
 
-  bool MediaFoundationDecoderSettings::isValid() {
-
-    if (0 == image_width) {
-      TRAE("The `image_width` is 0.");
-      return false;
-    }
-
-    if (0 == image_height) {
-      TRAE("The `image_height` is 0.");
-      return false;
-    }
-
-    if (NULL == on_decoded_data) {
-      TRAE("The `on_decoced_data` is not set.");
-      return false;
-    }
-                               
-    return true;
+    return 0;
   }
 
-  /* ------------------------------------------------------- */
+  int MediaFoundationDecoder::findDecoder(const GUID &input_type, const GUID &output_type) {
 
-  MediaFoundationDecoder::~MediaFoundationDecoder() {
-    shutdown();
-  }
-
-  /* ------------------------------------------------------- */
-
-  /*
-    Initialize the decoder and COM. Currently we initialize COM
-    using `COINIT_MULTITHREADED` which is [recommended][3] by
-    Microsoft, more info [here][2]. After initializing COM, we
-    create the decoder transform. Then we make sure we have only
-    one input and only one output which should be standard for 
-    decoders.
-   */
-  int MediaFoundationDecoder::init(MediaFoundationDecoderSettings& cfg) {
-
-    TRAE("@todo Maybe create a MediaFoundationUtils.h with some helper/debug functions. Like mft_videoformat_to_string. And get_last_error_as_string from MediaFoundationEncoder.cpp");
-    
-    IMFMediaType* media_type = NULL;
-    DWORD num_in_streams = 0;
-    DWORD num_out_streams = 0;
     HRESULT hr = S_OK;
     int r = 0;
+    UINT32 count = 0;
 
-    if (false == cfg.isValid()) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as the given settings are invalid.");
-      r = -1;
-      goto error;
-    }
-    
-    if (NULL != decoder_transform) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as our `decoder_transform` member is not NULL. Already initialized?");
-      r = -2;
-      goto error;
-    }
+    CLSID *ppCLSIDs = NULL;
 
-    settings = cfg;
+    MFT_REGISTER_TYPE_INFO input_info = {0};
+    MFT_REGISTER_TYPE_INFO output_info = {0};
 
-    hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to initialize COM.");
-      r = -3;
-      goto error;
-    }
+    input_info.guidMajorType = MFMediaType_Video; //@todo do we need audio
+    input_info.guidSubtype = input_type;
 
-    hr = CoCreateInstance(
-      CLSID_CMSH264DecoderMFT,
-      NULL,
-      CLSCTX_INPROC_SERVER,
-      IID_IMFTransform,
-      (void**)&decoder_transform
-    );
+    output_info.guidMajorType = MFMediaType_Video; //@todo do we need audio
+    output_info.guidSubtype = output_type;
 
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot innitialize the `MediaFoundationDecoder` as we failed to create the decoder transform instance.");
-      r = -4;
-      goto error;
-    }
+    hr = MFTEnum(MFT_CATEGORY_VIDEO_DECODER, 0, &input_info, &output_info, NULL, &ppCLSIDs, &count);
 
-    hr = decoder_transform->GetStreamCount(&num_in_streams, &num_out_streams);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to get the number of input and output streams.");
-      r = -5;
-      goto error;
-    }
-
-    if (1 != num_in_streams) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we expect the number of input streams to be 1 and we got %u.", num_in_streams);
-      r = -6;
-      goto error;
-    }
-
-    if (1 != num_out_streams) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we expect the number of output streams to be 1 and we got %u.", num_out_streams);
-      r = -7;
-      goto error;
-    }
-
-    /*
-      Should return E_NOTIMPL, [which means][0]
-      - The transform has a fixed number of streams.
-      - The transform allows the client to add or remove input streams.
-      - The stream identifiers are not consecutive starting from zero
-     */
-    hr = decoder_transform->GetStreamIDs(1, &stream_input_id, 1, &stream_output_id);
-    if (E_NOTIMPL == hr) {
-      stream_input_id = 0;
-      stream_output_id = 0;
-    }
-
-    if (UINT32_MAX == stream_input_id
-        || UINT32_MAX == stream_output_id)
-      {
-        TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to get the input (%u) or output (%u) stream ids.", stream_input_id, stream_output_id);
-        r = -8;
-        goto error;
-      }
-
-    /* 
-       When using MFTs it's important to be aware about the order
-       of setting up the input and output media types. The
-       encoder, for example, requires you to first setup the
-       output type and then the input type. The decoder requires
-       you to first setup the input type. We can verify this by
-       using [GetOutputAvailableType()][4]. When we first have to
-       set the input type, we get an error
-       `MF_E_TRANSFORM_TYPE_NOT_SET`.
-     */
-    hr = decoder_transform->GetOutputAvailableType(stream_output_id, 0, &media_type);
-    if (MF_E_TRANSFORM_TYPE_NOT_SET != hr) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder`. We expect a certain initialization order of the input and output streams (input first) which seems to be different than what we should do for this transform.");
-      r = -9;
-      goto error;
-    }
-
-    r = setInputMediaType();
-    if (r < 0) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as failed to set the input media type.");
+    if (S_OK != hr || 0 == count) {
+      TRAE("failed to find codec");
       r = -10;
       goto error;
     }
 
-    r = setOutputMediaType();
-    if (r < 0) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to set the output media type.");
-      r = -11;
+    hr = CoCreateInstance(ppCLSIDs[0], NULL, CLSCTX_INPROC_SERVER, IID_IMFTransform, (void **)&decoder_transform);
+    if (S_OK != hr) {
+      TRAE("failed to initiate codec");
+      r = -10;
       goto error;
     }
 
-    r = doesOutputProvideBuffers(output_provides_buffers);
-    if (r < 0) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to check if the output provides buffers.");
-      r = -12;
+  error:
+    CoTaskMemFree(ppCLSIDs);
+
+    return r;
+  }
+
+  // Finds and initializes decoder MFT
+  int MediaFoundationDecoder::init(tra_decoder_settings &cfg) {
+    settings = cfg;
+    HRESULT hr = S_OK;
+    int r;
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+    MFStartup(MF_VERSION);
+
+    GUID input_format;
+    GUID output_format;
+
+    r = convert_trameleon_to_mft_image_format(settings.input_format, input_format);
+    if (0 > r) {
+      TRAE("can't convert trameleon image format to mft format");
+      r = -10;
       goto error;
     }
 
-    if (true == output_provides_buffers) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as the transform provides buffers. We support only transform which do NOT provide buffers. ");
-      r = -13;
+    r = convert_trameleon_to_mft_image_format(settings.output_format, output_format);
+    if (0 > r) {
+      TRAE("can't convert trameleon image format to mft format");
+      r = -10;
       goto error;
     }
 
-    if (false == output_provides_buffers) {
-      r = createOutputBuffers();
-      if (r < 0) {
-        TRAE("Cannot initialize the `MediaFoundationDecoder`. Failed to create output buffers.");
-        r = -14;
-        goto error;
-      }
-    }
-
-    /* 
-       Check how we have to deal with input buffers. When the MFT
-       doesn't use refcounts it means that it copies the data. We 
-       currently do not support this method.
-    */
-    r = doesInputStreamUseRefCounts(input_uses_refcount);
-    if (r < 0) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder`. Failed to check if the input stream uses reference counting.");
-      r = -15;
+    hr = findDecoder(input_format, output_format);
+    if (S_OK != hr) {
+      TRAE("failed to get decoder");
+      r = -10;
       goto error;
     }
 
-    if (false == input_uses_refcount) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder`. We expect the MFT to manage input samples.");
-      r = -16;
+    hr = queryStreamCapabilities();
+    if (S_OK != hr) {
+      TRAE("Failed to GetStreamIDs for MFT");
+      r = -10;
+      goto error;
+    }
+
+    // configure the decoder input media type
+    hr = setInputMediaType();
+    if (S_OK != hr) {
+      TRAE("failed to set input type");
+      r = -10;
+      goto error;
+    }
+
+    // configure the decoder output media type
+    hr = setOutputMediaType();
+    if (S_OK != hr) {
+      TRAE("failed to set output type");
+      r = -10;
       goto error;
     }
 
     r = enableHardwareDecoding();
-    if (r < 0) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to enable hardware decoding.");
-      r = -15;
+    if (0 > r) {
+      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to enable hardware "
+           "decoding.");
+      r = -10;
       goto error;
     }
 
     r = enableLowLatencyDecoding();
-    if (r < 0) {
-      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to enable low latency decoding.");
-      r = -16;
+    if (0 > r) {
+      TRAE("Cannot initialize the `MediaFoundationDecoder` as we failed to enable low latency "
+           "decoding.");
+      r = -10;
       goto error;
     }
 
   error:
 
-    if (r < 0) {
-      shutdown();
-    }
-    
     return r;
   }
 
-  /* ------------------------------------------------------- */
-
-  /*
-    @todo We need to have a module wide solution to call
-    MFStartup()/MFShutdown().  This needs to be called only once
-    per "run".
-   */
-  int MediaFoundationDecoder::shutdown() {
-
+  HRESULT MediaFoundationDecoder::createInputMediaType(IMFMediaType **input_media_type,
+                                                          tra_decoder_settings &settings) {
+    int r = 0;
     HRESULT hr = S_OK;
-    int status = 0;
+    GUID mf_image_format;
+    IMFMediaType *mt = NULL;
 
-    if (NULL != output_sample) {
-      output_sample->Release();
+    hr = MFCreateMediaType(&mt);
+    if (S_OK != hr) {
+      TRAE("Failed to get IMFMediaType interface.\n");
+      r = -10;
+      goto error;
     }
 
-    if (NULL != output_media_buffer) {
-      output_media_buffer->Release();
+    hr = mt->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
+    if (S_OK != hr) {
+      TRAE("Failed to Set IMFMediaType major type attribute.\n");
+      r = -10;
+      goto error;
     }
 
-    if (NULL != decoder_transform) {
-      decoder_transform->Release();
+    r = convert_trameleon_to_mft_image_format(settings.input_format, mf_image_format);
+    if (0 > r) {
+      TRAE("Failed to convert image format to mft.\n");
+      r = -10;
+      goto error;
     }
 
-    output_sample = NULL;
-    output_media_buffer = NULL;
-    decoder_transform = NULL;
-    output_provides_buffers = false;
-    input_uses_refcount = false;
-    stream_output_id = UINT32_MAX;
-    stream_input_id = UINT32_MAX;
+    hr = mt->SetGUID(MF_MT_SUBTYPE, mf_image_format);
+    if (S_OK != hr) {
+      TRAE("Failed to Set IMFMediaType subtype type attribute.\n");
+      r = -10;
+      goto error;
+    }
 
-    return status;
+    hr = MFSetAttributeSize(mt, MF_MT_FRAME_SIZE, settings.image_width, settings.image_height);
+    if (S_OK != hr) {
+      TRAE("Failed to set frame size on H264 MFT in type.\n");
+      r = -10;
+      goto error;
+    }
+
+    *input_media_type = mt;
+
+  error:
+
+    return hr;
   }
 
-  /* ------------------------------------------------------- */
+  /// Set the input attributes for the decoder MFT
+  int MediaFoundationDecoder::setInputMediaType() {
+    // Set the input media type for the decoder
+    IMFMediaType *input_media_type = NULL;
+    int r = 0;
+    HRESULT hr = S_OK;
 
-  /*
-    
-    GENERAL INFO:
+    if (NULL == decoder_transform) {
+      TRAE("transform not set");
+      r = -10;
+      goto error;
+    }
 
-      This function will decode the given access unit were we
-      expect the data to use annex-b h264 (e.g. prefixed with a
-      00 00 00 01 start code).
-      
-      When we feed data into the decoder we create a
-      `IMFMediaBuffer` that we add to a `IMFSample`. The
-      `IMFSample` contains a buffer and adds some attributes.
+    hr = createInputMediaType(&input_media_type, settings);
+    if(S_OK != hr){
+      TRAE("Failed to create input media type");
+      r = -10;
+      goto error;
+    }
 
-      Currently we only support the `TRA_MEMORY_TYPE_HOST_H264`.
+    hr = decoder_transform->SetInputType(stream_input_id, input_media_type, 0);
+    if (S_OK != hr) {
+      TRAE("Failed to set input media type on H.264 decoder MFT.\n");
+      r = -10;
+      goto error;
+    }
 
-    TODO:
- 
-      @todo Currently I'm creating a new `IMFMediaBuffer` each
-      time you call `decode()`. I'm not sure if there is a
-      better, more optimised solution.
-    
-   */
+  error:
 
-  int MediaFoundationDecoder::decode(uint32_t type, void* data) {
+    return r;
+  }
 
-    tra_encoded_host_memory* host_mem = NULL;
-    IMFMediaBuffer* media_buffer = NULL;
+  HRESULT MediaFoundationDecoder::createOutputMediaType(IMFMediaType *output_media_type,
+                                                           tra_decoder_settings &settings) {
+    int r = 0;
+    HRESULT hr = S_OK;
+    GUID mf_image_format;
+
+    hr = output_media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video); //@todo do we need audio?
+    if (S_OK != hr) {
+      TRAE("Failed to set MF_MT_MAJOR_TYPE.\n");
+      r = -10;
+      goto error;
+    }
+
+    r = convert_trameleon_to_mft_image_format(settings.output_format,mf_image_format);
+    if (0 > r) {
+      TRAE("Failed to convert image format to mft.\n");
+      r = -10;
+      goto error;
+    }
+
+    hr = output_media_type->SetGUID(MF_MT_SUBTYPE, mf_image_format);
+    if (S_OK != hr) {
+      TRAE("Failed to set MF_MT_SUBTYPE.\n");
+      r = -10;
+      goto error;
+    }
+
+    hr = output_media_type->SetUINT32(MF_MT_AVG_BITRATE, settings.bitrate);
+    if (S_OK != hr) {
+      TRAE("Failed to set MF_MT_AVG_BITRATE.\n");
+      r = -10;
+      goto error;
+    }
+
+    hr = MFSetAttributeSize(output_media_type, MF_MT_FRAME_SIZE, settings.image_width, settings.image_height);
+    if (S_OK != hr) {
+      TRAE("Failed to set frame size on H264 MFT out type.\n");
+      r = -10;
+      goto error;
+    }
+
+    hr = MFSetAttributeRatio(output_media_type, MF_MT_FRAME_RATE, settings.fps_num, settings.fps_den);
+    if (S_OK != hr) {
+      TRAE("Failed to set frame rate on H264 MFT out type.\n");
+      r = -10;
+      goto error;
+    }
+
+    hr = MFSetAttributeRatio(output_media_type, MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
+    if (S_OK != hr) {
+      TRAE("Failed to set aspect ratio on H264 MFT out type.\n");
+      r = -10;
+      goto error;
+    }
+
+    hr = output_media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    if (S_OK != hr) {
+      TRAE("Failed to set MF_MT_INTERLACE_MODE.\n");
+      r = -10;
+      goto error;
+    }
+
+  error:
+
+    return hr;
+  }
+
+  // set the output attributes decoder MFT
+  int MediaFoundationDecoder::setOutputMediaType() {
+    IMFMediaType *output_madia_type = NULL;
+    HRESULT hr = S_OK;
+    int r = 0;
+
+    if (NULL == decoder_transform) {
+      TRAE("transform not set");
+      r = -10;
+      goto error;
+    }
+
+    hr = decoder_transform->GetOutputAvailableType(stream_output_id, 0, &output_madia_type);
+    if (S_OK != hr) {
+      TRAE("Cannot set the output media type as we failed to retrieve an available media type.");
+      r = -10;
+      goto error;
+    }
+
+    hr = createOutputMediaType(output_madia_type, settings);
+    if (S_OK != hr) {
+      TRAE("Failed to create decoder output type")
+      r = -10;
+      goto error;
+    }
+
+    hr = decoder_transform->SetOutputType(stream_output_id, output_madia_type, 0);
+    if (S_OK != hr) {
+      TRAE("Failed to set output media type on H.264 decoder MFT.\n");
+      r = -10;
+      goto error;
+    }
+
+  error:
+
+    return r;
+  }
+
+  // reconstructs the sample from encoded data
+  int MediaFoundationDecoder::decode(tra_memory_h264 *data, LONGLONG timestamp, LONGLONG &duration) {
+
+    IMFSample *input_sample = NULL;
+    IMFMediaBuffer *input_buffer = NULL;
+    BYTE *pData = NULL;
     DWORD media_buffer_curr_length = 0;
     DWORD media_buffer_max_length = 0;
-    BYTE* media_buffer_ptr = NULL;
-    IMFSample* sample = NULL;
-    HRESULT hr = S_OK;
     int r = 0;
+    HRESULT hr = S_OK;
 
-    if (TRA_MEMORY_TYPE_HOST_H264 != type) {
-      TRAE("Cannot decode the given data as the `type` is not supported.");
+    if (NULL == data) {
+      TRAE("input not given");
       r = -10;
       goto error;
     }
-    
-    if (NULL == data) {
-      TRAE("Cannot decode the given `data` as it's NULL.");
-      r = -20;
+
+    // Create a new memory buffer.
+    hr = MFCreateMemoryBuffer(data->size, &input_buffer);
+    if (S_OK != hr) {
+      TRAE("Failed to create Memory Buffer");
+      r = -10;
       goto error;
     }
 
-    // if (0 == nbytes) {
-    //   TRAE("Cannot decode the given data as it's 0 bytes.");
-    //   r = -2;
-    //   goto error;
-    // }
-
-    if (NULL == decoder_transform) {
-      TRAE("Cannot decode as our `encode_transform` member is NULL. Not initialized?");
-      r = -30;
+    // Lock the buffer and copy the video frame to the buffer.
+    hr = input_buffer->Lock(&pData, &media_buffer_max_length, &media_buffer_curr_length);
+    if (S_OK != hr) {
+      TRAE("Failed to lock Memory Buffer");
+      r = -10;
       goto error;
     }
 
-    host_mem = (tra_encoded_host_memory*) data;
-    if (NULL == host_mem->data) {
-      TRAE("Cannot decode as the `data` member of the `tra_encoded_host_memory` is NULL.");
-      r = -40;
+    memcpy(pData, data->data, data->size);
+
+    input_buffer->SetCurrentLength(data->size);
+    input_buffer->Unlock();
+
+    // Create a media sample and add the buffer to the sample.
+    hr = MFCreateSample(&input_sample);
+    if (S_OK != hr) {
+      TRAE("Failed to create sample");
+      r = -10;
       goto error;
     }
 
-    if (0 == host_mem->size) {
-      TRAE("Cannot decode as the `size` member of the `tra_encoded_host_memory` is 0.");
-      r = -50;
+    hr = input_sample->AddBuffer(input_buffer);
+    if (S_OK != hr) {
+      TRAE("Failed to add Memory Buffer to sample");
+      r = -10;
       goto error;
     }
 
-    hr = MFCreateSample(&sample);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot decode, failed to create a sample.");
-      r = -60;
+    // Set the time stamp and the duration.
+    hr = input_sample->SetSampleTime(timestamp);
+    if (S_OK != hr) {
+      TRAE("Failed to set sample time");
+      r = -10;
       goto error;
     }
 
-    hr = sample->SetSampleDuration(0);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot decode, failed to set the sample duraction on the sample.");
-      r = -70;
+    hr = input_sample->SetSampleDuration(duration);
+    if (S_OK != hr) {
+      TRAE("Failed to set sample durration");
+      r = -10;
       goto error;
     }
 
-    hr = MFCreateMemoryBuffer(host_mem->size, &media_buffer);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot decode, failed to create a memory buffer.");
-      r = -80;
+    hr = createOutputSample();
+    if(S_OK != hr){
+      TRAE("failed to create output sample");
+      r = -10;
       goto error;
     }
 
-    hr = media_buffer->Lock(&media_buffer_ptr, &media_buffer_max_length, &media_buffer_curr_length);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot decode, failed to lock the media buffer.");
-      r = -90;
+    hr = processSample(&input_sample, timestamp, duration);
+    if (S_OK != hr) {
+      TRAE("Failed to process sample");
+      r = -10;
       goto error;
     }
 
-    /* @todo Not sure if we want to keep this here. The buffer we allocate must be able to contain the amount of bytes we requested. */
-    if (media_buffer_max_length < host_mem->size) {
-      TRAE("Cannot decode, the created buffer is too small (?). From my understanding this is not possible; we whould reproduce this.");
-      exit(EXIT_FAILURE);
-    }
-
-    TRAD(
-      "media_buffer_max_length: %u, media_buffer_curr_length: %u, media_buffer_ptr: %p",
-      media_buffer_max_length,
-      media_buffer_curr_length,
-      media_buffer_ptr
-    );
-
-    /* Copy the access unit... */
-    memcpy(media_buffer_ptr, host_mem->data, host_mem->size);
-
-    hr = media_buffer->Unlock();
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot decode, failed to unlock the media buffer.");
-      r = -100;
-      goto error;
-    }
-
-    /* The the buffer how much data we copied. */
-    hr = media_buffer->SetCurrentLength(host_mem->size);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot decode, failed to tell the `IMFMediaBuffer` how much data we copied.");
-      r = -110;
-      goto error;
-    }
-
-    /* We have to wrap our buffer into a `IMFSample`.  */
-    hr = sample->AddBuffer(media_buffer);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Failed to add the `IMFMediaBuffer` to the `IMFSample`.");
-      r = -120;
-      goto error;
-    }
-
-    /* Feed the data into the decoder. @todo what if too big forr one process maarten*/
-    hr = decoder_transform->ProcessInput(stream_input_id, sample, 0);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Failed to process input.");
-      r = -130;
-      goto error;
-    }
-
-    r = processOutput();
-    if (r < 0) {
-      TRAE("Failed to process output.");
-      r = -140;
-      goto error;
-    }
-    
   error:
-
-    if (NULL != media_buffer) {
-      media_buffer->Release();
-      media_buffer = NULL;
-    }
-
-    if (NULL != sample) {
-      sample->Release();
-      sample = NULL;
-    }
+    Release(&input_sample);
+    Release(&output_sample);
 
     return r;
   }
 
-  /* ------------------------------------------------------- */
-  
-  int MediaFoundationDecoder::processOutput() {
-
-    if (true == output_provides_buffers) {
-      return processOutputWithTransformBuffers();
-    }
-
-    return processOutputWithClientBuffers();
-  }
-
-  /* ------------------------------------------------------- */
-
-  /*
-    GENERAL INFO:
- 
-      This function will extract the decoded data. The data is
-      stoed in our `IMFSample` (output_sample) which wraps our
-      `IMFMediaBuffer()` (output_media_buffer).
-
-      I haven't found the best way to reconstruct a `tra_memory_image`
-      from the decode data. I did not find a win32 function that
-      allows me to get the width, height, stride, etc. Therefore
-      I'll hardcode the image based on the image format that was
-      passed with the `MediaFoundationDecoderSettings` into
-      `init()`.
-
-    TODO:
-
-       @todo Currently this code requires the user to specify the
-       image width and height of the decoded video. We are not
-       handling the `MF_E_TRANSFORM_STREAM_CHANGE` event which
-       idicates that the width and height of the decoded video
-       might be different than the size we used to initialize the
-       decoder. We have to implement this to make sure that we
-       setup the `decode_image` (see below) correctly.
-
-    REFERENCES:
-
-      [0]: https://github.com/strukturag/LAVFilters/blob/master/decoder/LAVVideo/decoders/wmv9mft.cpp#L573 "Hardcoded strides, planes, etc."
-    
-   */
-  int MediaFoundationDecoder::processOutputWithClientBuffers() {
-
-    MFT_OUTPUT_DATA_BUFFER output_data = { 0 };
-    tra_memory_image decoded_image = { 0 };
-    BYTE* output_buffer_data_ptr = NULL;
-    DWORD output_buffer_data_length = 0;
-    DWORD buffer_count = 0;
-    uint8_t did_lock = 0;
+  // Query stream limits to determine pipeline characteristics...I.E fix size stream and Stream ID
+  int MediaFoundationDecoder::queryStreamCapabilities() {
     HRESULT hr = S_OK;
-    DWORD status = 0;
-    DWORD i = 0;
     int r = 0;
-    
+    // Store stream limit info to determine pipeline capabailities
+    DWORD mInputStreamMin = 0;
+    DWORD mInputStreamMax = 0;
+    DWORD mOutputStreamMin = 0;
+    DWORD mOutputStreamMax = 0;
+
     if (NULL == decoder_transform) {
-      TRAE("Cannot process the output as our `decoder_transform` member is NULL.");
+      TRAE("transform not set");
       r = -10;
       goto error;
     }
 
-    if (true == output_provides_buffers) {
-      TRAE("Cannot process the output using client buffers as the MFT provides buffers.");
-      r = -20;
+    // if the min and max input and output stream counts are the same, the MFT is a Fix stream size. So we cannot add or remove streams
+    hr = decoder_transform->GetStreamLimits(&mInputStreamMin, &mInputStreamMax, &mOutputStreamMin, &mOutputStreamMax);
+    if (S_OK != hr) {
+      TRAE("Failed to GetStreamLimits for MFT");
+      r = -10;
       goto error;
     }
+
+    hr = decoder_transform->GetStreamIDs(mInputStreamMin, &stream_input_id, mOutputStreamMin, &stream_output_id);
+    if (E_NOTIMPL == hr) {
+      stream_input_id = 0;
+      stream_output_id = 0;
+      hr = S_OK;
+    }
+
+    if (S_OK != hr) {
+      TRAE("Failed to GetStreamIDs for MFT");
+      r = -10;
+      goto error;
+    }
+
+  error:
+    return r;
+  }
+
+  // Process the incoming sample
+  int MediaFoundationDecoder::processSample(IMFSample **input_sample, LONGLONG &time, LONGLONG &duration) {
+    DWORD buffer_count = 0;
+    MFT_OUTPUT_DATA_BUFFER output_data_buffer = {0};
+    int r = 0;
+    HRESULT hr = S_OK;
 
     if (NULL == output_sample) {
-      TRAE("Cannot process the output sample as our `output_sample` member is NULL.");
-      r = -30;
-      goto error;
-    }
-
-    /* Currently we only support NV12 as output type. */
-    if (TRA_IMAGE_FORMAT_NV12 != output_image_format) {
-      TRAE("Cannot process the output sample as the output image format is not supported.");
-      r = -35;
-      goto error;
-    }
-
-    if (NULL == settings.on_decoded_data) {
-      TRAE("Cannot process the outptu as the `on_decoded_data` callback is not set. Makes no sense to decode w/o using the decoded data.");
-      r = -40;
-      goto error;
-    }
-
-    /* Check if there is decoded data. */
-    while (true) {
-
-      /* 
-         We reuse the same `IMFMediaBuffer`. The MFT fills it and
-         sets the current length.  When we don't reset, the MFT
-         will fail when it can't add any more decoded data,
-         therefore we should reset the length.
-      */
-      hr = output_media_buffer->SetCurrentLength(0);
-      if (false == SUCCEEDED(hr)) {
-        TRAE("Cannot process the output, failed to reset the current length of our`IMFMediaBuffer`.");
-        r = -50;
-        goto error;
-      }
-      
-      output_data.dwStreamID = stream_output_id;
-      output_data.dwStatus = 0;
-      output_data.pEvents = NULL;
-      output_data.pSample = output_sample;
-
-      hr = decoder_transform->ProcessOutput(0, 1, &output_data, &status);
-      if (MF_E_TRANSFORM_STREAM_CHANGE == hr) {
-        IMFTransform::GetOutputAvailableType()
-      }
-
-      /* This will most likely happen every 2nd loop which is ok. */
-      if (MF_E_TRANSFORM_NEED_MORE_INPUT == hr) {
-        r = 0;
-        goto error;
-      }
-
-      if (S_OK != hr) {
-        TRAE("Cannot process the output, unhandled error from `ProcessOutput()`: %08x", hr);
-        r = -60;
-        goto error;
-      }
-
-      /* Access the decoded data. */
-      hr = output_sample->GetBufferCount(&buffer_count);
-      if (false == SUCCEEDED(hr)) {
-        TRAE("Cannot process the output, failed to get the buffer count; cannot extract decoded data.");
-        r = -70;
-        goto error;
-      }
-
-      if (1 != buffer_count) {
-        TRAE("Cannot process the output. We allocate only one output buffer but the MFT stored more? (exiting)");
-        exit(EXIT_FAILURE);
-      }
-        
-      hr = output_media_buffer->Lock(&output_buffer_data_ptr, &output_buffer_data_length, NULL);
-      if (false == SUCCEEDED(hr)) {
-        TRAE("Cannot process the output, failed to lock the output buffer.");
-        r = -80;
-        goto error;
-      }
-
-      did_lock = 1;
-
-      /* Setup the output image that we hand over to the user. */
-      switch (output_image_format) {
-        
-        case TRA_IMAGE_FORMAT_NV12: {
-
-          decoded_image.image_format = TRA_IMAGE_FORMAT_NV12;
-          decoded_image.image_width = settings.image_width;
-          decoded_image.image_height = settings.image_height;
-          decoded_image.plane_count = 2;
-          
-          decoded_image.plane_strides[0] = settings.image_width;
-          decoded_image.plane_strides[1] = settings.image_width;
-          decoded_image.plane_strides[2] = 0;
-          
-          decoded_image.plane_heights[0] = settings.image_height;
-          decoded_image.plane_heights[1] = settings.image_height / 2;
-          decoded_image.plane_heights[2] = 0;
-          
-          decoded_image.plane_data[0] = output_buffer_data_ptr;
-          decoded_image.plane_data[1] = output_buffer_data_ptr + (settings.image_width * settings.image_height);
-          decoded_image.plane_data[2] = NULL;
-          break;
-        }
-        
-        default: {
-          TRAE("Cannot process the output, the `output_image_format` is not supported yet.");
-          r = -90;
-          goto error;
-        }
-      }
-
-      /*
-        Notify the user about the decode image; the user can
-        e.g. render the image or send it over the network etc.
-      */
-      r = settings.on_decoded_data(
-        TRA_MEMORY_TYPE_IMAGE,
-        &decoded_image,
-        settings.user
-      );
-
-      if (r < 0) {
-        TRAE("The user failed to handle the decoded image.");
-        r = -100;
-        goto error;
-      }
-      
-      TRAD("We have %u buffers, len: %u", buffer_count, output_buffer_data_length);
-
-      hr = output_media_buffer->Unlock();
-      if (false == SUCCEEDED(hr)) {
-        TRAE("Cannot process the output, failed to unlock() our output buffer.");
-        r = -110;
-        goto error;
-      }
-
-      did_lock = 0;
-      
-    } /* while (true) */
-
-  error:
-
-    /*
-      It may happen that the while(true) loop above runs into an
-      error. When that happens, the `output_media_buffer` could
-      still be locked; therefore we unlock it here.
-    */
-    if (1 == did_lock) {
-      hr = output_media_buffer->Unlock();
-      if (false == SUCCEEDED(hr)) {
-        TRAE("Cannot process the output, failed to unlock() our output buffer.");
-        r = -120;
-      }
-    }
-
-    return r;
-  }
-
-  /* ------------------------------------------------------- */
-  
-  int MediaFoundationDecoder::processOutputWithTransformBuffers() {
-    TRAE("@todo We haven't implemented a function to process the input when the MFT manages the output.");
-    return -1;
-  }
-
-  /* ------------------------------------------------------- */
-
-  /* 
-     For a decoder we first have to specify the input type and
-     then the output type. After we've set the input type, the
-     output type changes. Only then we can call
-     `GetOutputAvailableType()`. We also have to set the size of
-     the video. The MF_MT_FRAME_SIZE changes the value of
-     `MFT_OUTPUT_STREAM_INFO::cbSize`. See
-     `createOutputBuffers()`.
-   */
-  int MediaFoundationDecoder::setInputMediaType() {
-    
-    IMFMediaType* media_type = NULL;
-    HRESULT hr = S_OK;
-    int r = 0;
-
-    if (NULL == decoder_transform) {
-      TRAE("Cannot set the input media type as our `decoder_transform` member is NULL.");
-      r = -1;
-      goto error;
-    }
-
-    if (UINT32_MAX == stream_input_id) {
-      TRAE("Cannot set the input media type as out `stream_input_id` is not set. Did you call `init()`?");
-      r = -2;
-      goto error;
-    }
-
-    if (false == settings.isValid()) {
-      TRAE("Cannot set the output media type as our `settings` member is invalid.");
-      r = -3;
-      goto error;
-    }
-
-    hr = MFCreateMediaType(&media_type);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the input media type as we failed to create an `IMFMediaType` instance.");
-      r = -4;
-      goto error;
-    }
-
-    hr = media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the input media type as we failed to set the major type to video.");
-      r = -5;
-      goto error;
-    }
-
-    hr = media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the input media type as we failed to set the sub type to h264.");
-      r = -6;
-      goto error;
-    }
-
-    hr = MFSetAttributeSize(media_type, MF_MT_FRAME_SIZE, settings.image_width, settings.image_height);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the input media type, failed to set the frame size.");
-      r = -7;
-      goto error;
-    }
-
-    hr = decoder_transform->SetInputType(stream_input_id, media_type, 0);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the input media type as the call to `setInputMediaType()` failed.");
-      r = -8;
-      goto error;
-    }
-                                              
-  error:
-
-    if (NULL != media_type) {
-      media_type->Release();
-      media_type = NULL;
-    }
-    
-    return r;
-  }
-
-  /* ------------------------------------------------------- */
-
-  int MediaFoundationDecoder::setOutputMediaType() {
-
-    IMFMediaType* media_type = NULL;
-    GUID output_pix_guid = { 0 };
-    HRESULT hr = S_OK;
-    int r = 0;
-
-    if (NULL == decoder_transform) {
-      TRAE("Cannot set the output media type as our `decoder_transform` is NULL.");
+      TRAE("input sample not set");
       r = -10;
       goto error;
     }
 
-    if (UINT32_MAX == stream_output_id) {
-      TRAE("Cannot set the output media type as our `stream_output_id` is invalid. Did you call `init()`?");
-      r = -20;
+    if (NULL == *input_sample) {
+      TRAE("input sample not set");
+      r = -10;
       goto error;
     }
 
-    hr = decoder_transform->GetOutputAvailableType(stream_output_id, 0, &media_type);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the output media type as we failed to retrieve an available media type.");
-      r = -30;
-      goto error;
-    }
-
-    hr = decoder_transform->SetOutputType(stream_output_id, media_type, 0);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the output media type as the call to `SetOutputType()` failed: %s", get_last_error_as_string().c_str());
-      r = -40;
-      goto error;
-    }
-
-    hr = media_type->GetGUID(MF_MT_SUBTYPE, &output_pix_guid);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot set the output media type as we failed to get the pixel format of the available type.");
-      r = -50;
-      goto error;
-    }
-
-    /* Convert the output video format to a image format that this library understands. */
-    r = mft_videoformat_to_imageformat(output_pix_guid, &output_image_format);
-    if (r < 0) {
-      TRAE("Cannot set the output media type. Failed to convert the pixel format GUID from the output type into a image format.");
-      r = -60;
-      goto error;
-    }
-
-    mft_print_mediatype(media_type);
-
-  error:
-
-    if (NULL != media_type) {
-      media_type->Release();
-      media_type = NULL;
-    }
-    
-    return r;
-  }
-
-  /* ------------------------------------------------------- */
-
-  /*
-    GENERAL INFO:
-    
-      See [About MFTs][3] and the paragraph about "Processing
-      Data". There they describe that the `ProcessOutput`
-      supports two different allocation modes. Either the MFT
-      allocates output buffers or the client must manage output
-      buffers.
-      
-      We use `GetOutputStreamInfo()` to determine if we should
-      allocate buffers for the output data.
-
-    TODO: 
-
-      @todo The `MediaFoundationEncoder` has an identical
-      function; we might want to create some shared utils that
-      checks this. Though for now I think it's fine to have a
-      couple of duplicate lines.
-
-    REFERENCES:
-
-      [0]: https://docs.microsoft.com/en-us/windows/win32/api/mftransform/ns-mftransform-mft_output_stream_info "MFT_OUTPUT_STREAM_INFO".
-
-   */
-  int MediaFoundationDecoder::doesOutputProvideBuffers(bool& doesProvide) {
-
-    MFT_OUTPUT_STREAM_INFO stream_info = { 0 };
-    HRESULT hr = S_OK;
-    int r = 0;
-
-    TRAE("@todo check the `cbAlignment` field of the `MFT_OUTPUT_STREAM_INFO` which indicates how we should align our memory buffers.");
-    
     if (NULL == decoder_transform) {
-      TRAE("Cannot check if the output provides buffers as our `decoder_transform` is NULL. ");
-      r = -1;
+      TRAE("transform not set");
+      r = -10;
       goto error;
     }
 
-    if (UINT32_MAX == stream_output_id) {
-      TRAE("Cannot check if the output provides buffers as our `stream_output_id` is invalid.");
-      r = -2;
-      goto error;
-    }
+    // Set the encoded_data sample
+    output_data_buffer.dwStreamID = stream_output_id;
+    output_data_buffer.dwStatus = 0;
+    output_data_buffer.pEvents = NULL;
+    output_data_buffer.pSample = output_sample;
 
-    hr = decoder_transform->GetOutputStreamInfo(stream_output_id, &stream_info);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot check if we should create output buffers, `GetOutputStreamInfo()` failed.");
-      r = -3;
-      goto error;
-    }
+    do {
+      hr = decoder_transform->ProcessInput(stream_input_id, *input_sample, 0);
+      if (S_OK != hr && MF_E_NOTACCEPTING != hr) {
+        TRAE("failed to process input");
+        r = -10;
+        goto error;
+      }
 
-    doesProvide = (stream_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES) ? true : false;
+      hr = output_sample->GetBufferCount(&buffer_count);
+      if(S_OK != hr){
+        TRAE("failed to get ouput buffer count");
+        r = -10;
+        goto error;
+      }
 
-  error:
-    return r;
-  }
+      // Generate the encoded_data sample
+      DWORD test = 0;
+      hr = decoder_transform->ProcessOutput(0, buffer_count, &output_data_buffer, &test);
 
-  /* ------------------------------------------------------- */
+      if (S_OK != hr && MF_E_TRANSFORM_NEED_MORE_INPUT != hr && MF_E_TRANSFORM_STREAM_CHANGE != hr) {
+        TRAE("failed to process output");
+        r = -10;
+        goto error;
+      }
 
-  /*
-    GENERAL INFO:
 
-      We check if the input uses ref counting or not as this
-      tells us how we have to deal with input buffers. When the
-      input use ref counting (useRefCount == false), then we can
-      directly release the input data or reuse it. Otherwise,
-      when the input stream uses refcounting we can only reuse
-      the input samples when the MFT released them.
+      if (S_OK == hr) {
+        // get decoded data
+        hr = getOutput(output_data_buffer, time, duration);
+        if (S_OK != hr) {
+          TRAE("failed to output decoded sample");
+          r = -10;
+          goto error;
+        }
+        continue;
+      }
 
-    TODO:
+      if (MF_E_TRANSFORM_NEED_MORE_INPUT == hr) continue;
 
-      This function is similar to the one in
-      `MediaFoundationEncoder` and we could move them both some
-      utils class/func.
+      // handle MF_E_TRANSFORM_STREAM_CHANGE
+      r = queryStreamCapabilities();
+      if (0 > r) {
+        TRAE("failed to get streamids");
+        r = -10;
+        goto error;
+      }
 
-   */
-  int MediaFoundationDecoder::doesInputStreamUseRefCounts(bool& useRefCount) {
+      IMFMediaType *mediatype = NULL;
+      hr = decoder_transform->GetOutputAvailableType(stream_output_id, 0, &mediatype);
+      if (S_OK != hr) {
+        TRAE("failed to handle MF_E_TRANSFORM_STREAM_CHANGE");
+        r = -10;
+        goto error;
+      }
 
-    MFT_INPUT_STREAM_INFO stream_info = { 0 };
-    HRESULT hr = S_OK;
-    int r = 0;
+      hr = decoder_transform->SetOutputType(stream_output_id, mediatype, 0);
+      if (S_OK != hr) {
+        TRAE("failed to set output type after stream change");
+        r = -10;
+        goto error;
+      }
 
-    /* We always default to false. */
-    useRefCount = false;
-    
-    if (NULL == decoder_transform) {
-      TRAE("Cannot check if the input stream uses reference counting, `decoder_transform` is NULL.");
-      r = -1;
-      goto error;
-    }
-
-    if (UINT32_MAX == stream_input_id) {
-      TRAE("Cannot check if the input stream uses reference counting, `stream_input_id` is invalid.");
-      r = -2;
-      goto error;
-    }
-
-    hr = decoder_transform->GetInputStreamInfo(stream_input_id, &stream_info);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot check if the input stream uses reference counting, `GetInputStreamInfo()` failed.");
-      r = -3;
-      goto error;
-    }
-
-    useRefCount = (stream_info.dwFlags & MFT_INPUT_STREAM_DOES_NOT_ADDREF) ? false : true;
+    } while (hr == MF_E_TRANSFORM_NEED_MORE_INPUT);
 
   error:
 
     return r;
   }
 
-  /* ------------------------------------------------------- */
-
-   /*
-     GENERAL INFO:
-
-      See "Output Buffers" from the [ProcessOutput][5]
-      documentation. When the client needs to allocate the output
-      buffers, then this function is called (via `init()`). We
-      first get the stream info to determine the size of buffer
-      we need to allocate. The `MFT_OUTPUT_STREAM_INFO::cbSize`
-      member is influence by the `MF_MT_FRAME_SIZE` value which
-      we've set for the INPUT stream. See `setInputMediaType()`.
-
-    TODO:
-
-      @todo In `MediaFoundationEncoder` we have a similar function; 
-      we should create a utils/helper that does this for us. 
-
-   */
-  int MediaFoundationDecoder::createOutputBuffers() {
-
-    MFT_OUTPUT_STREAM_INFO stream_info = { 0 };
+  int MediaFoundationDecoder::createOutputSample() {
+    bool output_provides_buffers = true;
+    IMFMediaBuffer *output_buffer = NULL;
     HRESULT hr = S_OK;
     int r = 0;
 
-    TRAE("@todo we should/could create a utils function that creates the output buffers as it's similar to what the encoder does.");
-    
-    if (NULL == decoder_transform) {
-      TRAE("Cannot create output buffers, decoder transform is NULL.");
-      r = -1;
+    if(NULL != output_sample){
+      TRAE("output sample already created");
+      r = -10;
       goto error;
     }
 
-    if (UINT32_MAX == stream_output_id) {
-      TRAE("Cannot create output buffers, `stream_output_id` is invalid.");
-      r = -2;
-      goto error;
+    // Flag to specify that the MFT provides the output sample for this stream (thought internal allocation or operating on the input stream)
+    if (NULL == &output_stream_info) {
+      TRAE("ouput_stream_info is not initialized");
+      return -10;
+    }
+    output_provides_buffers = MFT_OUTPUT_STREAM_PROVIDES_SAMPLES == output_stream_info.dwFlags || MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES == output_stream_info.dwFlags;
+
+    if(output_provides_buffers){
+      output_sample = NULL;
+      return 0;
     }
 
-    /* Make sure the sample or buffer haven't been created already. */
-    if (NULL != output_sample) {
-      TRAE("Cannot create the output buffers; the `output_sample` member is not NULL. Already created?");
-      r = -3;
+    hr = queryOutputStreamInfo();
+    if(S_OK != hr){
+      TRAE("failed to querry stream info");
+      r = -10;
       goto error;
     }
+    if (0 == output_stream_info.cbSize) { output_stream_info.cbSize = 1024 * 1024; }
 
-    if (NULL != output_media_buffer) {
-      TRAE("Cannot create the output buffers; the `output_media_buffer` member is not NULL. Already created?");
-      r = -4;
-      goto error;
-    }
 
-    hr = decoder_transform->GetOutputStreamInfo(stream_output_id, &stream_info);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot create output buffers, `GetOutputStreamInfo()` failed.");
-      r = -5;
-      goto error;
-    }
-
-    if (0 == stream_info.cbSize) {
-      TRAE("Cannot create output buffers, `cbSize` of the `MFT_OUTPUT_STREAM_INFO` is 0 (?).");
-      r = -6;
+    hr = MFCreateMemoryBuffer(output_stream_info.cbSize, &output_buffer);
+    if (S_OK != hr) {
+      TRAE("Failed to MFCreateMemoryBuffer");
+      r = -10;
       goto error;
     }
 
     hr = MFCreateSample(&output_sample);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot create the output buffers. `MFCreateSample()` failed.");
-      r = -7;
+    if (S_OK != hr) {
+      TRAE("Failed to MFCreateSample");
+      r = -10;
       goto error;
     }
 
-    hr = MFCreateMemoryBuffer(stream_info.cbSize, &output_media_buffer);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot create output buffers, failed to create the memory buffer.");
-      r = -8;
+    hr = output_sample->AddBuffer(output_buffer);
+    if (S_OK != hr) {
+      TRAE("Failed to AddBuffer to sample");
+      r = -10;
       goto error;
     }
 
-    hr = output_sample->AddBuffer(output_media_buffer);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot create output buffers, failed to add the media buffer to the sample.");
-      r = -9;
-      goto error;
-    }
-    
   error:
-
-    if (r < 0) {
-      
-      if (NULL != output_sample) {
-        output_sample->Release();
-        output_sample = NULL;
-      }
-      
-      if (NULL != output_media_buffer) {
-        output_media_buffer->Release();
-        output_media_buffer = NULL;
-      }
-    }
-    
-    return r;    
+    return hr;
   }
 
-  /* ------------------------------------------------------- */
+  // Gets the buffer requirements and other information for the output stream of the MFT
+  int MediaFoundationDecoder::queryOutputStreamInfo() {
+    if (!decoder_transform) {
+      TRAE("no transform initialised");
+      return -1;
+    }
+
+    HRESULT hr = decoder_transform->GetOutputStreamInfo(stream_output_id, &output_stream_info);
+
+    if (S_OK != hr) {
+      TRAE("Failed to query output stream info");
+      return -2;
+    }
+
+    return 0;
+  }
+
+  // Write the decoded sample out to a file
+  int MediaFoundationDecoder::getOutput(MFT_OUTPUT_DATA_BUFFER &outputDataBuffer,
+                                               LONGLONG &time, LONGLONG &duration) {
+    TRAD("retrieving decoded data");
+    DWORD buffer_length;
+    tra_memory_image decoded_image;
+    IMFMediaBuffer* output_buffer = NULL;
+    DWORD output_buffer_max_length = 0;
+    DWORD buffer_count = 0;
+    byte *output_buffer_data_ptr = NULL;
+    int r = 0;
+    HRESULT hr = S_OK;
+
+    hr = outputDataBuffer.pSample->SetSampleTime(time);
+    if (S_OK != hr) {
+      TRAE("cannot get timestamp");
+      r = -10;
+      goto error;
+    }
+    hr = outputDataBuffer.pSample->SetSampleDuration(duration);
+    if (S_OK != hr) {
+      TRAE("cannot get sample duration");
+      r = -10;
+      goto error;
+    }
+
+    hr = output_sample->ConvertToContiguousBuffer(&output_buffer);
+    if (S_OK != hr) {
+      TRAE("cannot convert decoded buffer to contiguous buffer");
+      r = -10;
+      goto error;
+    }
+
+    hr = output_buffer->GetCurrentLength(&buffer_length);
+    if (S_OK != hr) {
+      TRAE("cannot get length of decoded buffer");
+      r = -10;
+      goto error;
+    }
+
+    hr = output_sample->GetBufferCount(&buffer_count);
+    if(S_OK != hr){
+      TRAE("failed to get ouput buffer count");
+      r = -10;
+      goto error;
+    }
+
+    for(int i = 0; i < buffer_count; i++) {
+      output_sample->GetBufferByIndex(i, &output_buffer);
+
+      output_buffer->Lock(&output_buffer_data_ptr, &output_buffer_max_length, &buffer_length);
+
+      decoded_image.image_format = settings.output_format;
+      decoded_image.image_width = settings.image_width;
+      decoded_image.image_height = settings.image_height;
+      decoded_image.plane_count = 2;
+
+      decoded_image.plane_strides[0] = settings.image_width;
+      decoded_image.plane_strides[1] = settings.image_width;
+      decoded_image.plane_strides[2] = 0;
+
+      decoded_image.plane_heights[0] = settings.image_height;
+      decoded_image.plane_heights[1] = settings.image_height / 2;
+      decoded_image.plane_heights[2] = 0;
+
+      decoded_image.plane_data[0] = output_buffer_data_ptr;
+      decoded_image.plane_data[1] = output_buffer_data_ptr + (settings.image_width * settings.image_height);
+      decoded_image.plane_data[2] = NULL;
+
+      settings.callbacks.on_decoded_data(TRA_MEMORY_TYPE_IMAGE, &decoded_image, settings.callbacks.user);
+
+      output_buffer->Unlock();
+    }
+
+    output_sample->RemoveAllBuffers();
+
+  error:
+
+    return r;
+  }
+
+  // Send request to MFT to allocate necessary resources for streaming
+  int MediaFoundationDecoder::sendStreamStartMessage() {
+    if (!decoder_transform) {
+      TRAE("decoder has not been initialised");
+      return -1;
+    }
+
+    HRESULT hr = decoder_transform->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, NULL);
+    if (S_OK != hr) {
+      TRAE("failed to send start message");
+      return -2;
+    }
+
+    return 0;
+  }
+
+  // Send request to MFT to de-allocate necessary resources for streaming
+  int MediaFoundationDecoder::sendStreamEndMessage() {
+    if (!decoder_transform) {
+      TRAE("decoder has not been initialised");
+      return -1;
+    }
+
+    HRESULT hr = decoder_transform->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, NULL);
+    if (S_OK != hr) {
+      TRAE("failed to send end message");
+      return -2;
+    }
+
+    return 0;
+  }
+
+  int MediaFoundationDecoder::enableLowLatencyDecoding() {
+
+    IMFAttributes *attribs = NULL;
+    HRESULT hr = S_OK;
+    int r = 0;
+
+    if (NULL == decoder_transform) {
+      TRAE("Cannot enable low latency decoding; our `decoder_transform` member is NULL. Did you "
+           "call `init()`?");
+      r = -1;
+      goto error;
+    }
+
+    hr = decoder_transform->GetAttributes(&attribs);
+    if (S_OK != hr) {
+      TRAE("Cannot enable low latency decoding; we failed to get the attributes from the "
+           "transform.");
+      r = -2;
+      goto error;
+    }
+
+    hr = attribs->SetUINT32(CODECAPI_AVLowLatencyMode, TRUE);
+    if (S_OK != hr) {
+      TRAE("Cannot enable low latency decoding; we failed to change the mode.");
+      r = -3;
+      goto error;
+    }
+
+  error:
+
+    if (NULL != attribs) {
+      attribs->Release();
+      attribs = NULL;
+    }
+
+    return r;
+  }
 
   int MediaFoundationDecoder::enableHardwareDecoding() {
 
-    IMFAttributes* attribs = NULL;
-    ICodecAPI* codec = NULL;
+    IMFAttributes *attribs = NULL;
+    ICodecAPI *codec = NULL;
     HRESULT hr = S_OK;
     int r = 0;
-    
-    
+
     if (NULL == decoder_transform) {
       TRAE("Cannot enable hardware decoding as our `decoder_transform` is NULL.");
       r = -1;
       goto error;
     }
-    
-    hr = decoder_transform->QueryInterface(IID_ICodecAPI, (void**)&codec);
-    if (false == SUCCEEDED(hr)) {
+
+    hr = decoder_transform->QueryInterface(IID_ICodecAPI, (void **)&codec);
+    if (S_OK != hr) {
       TRAE("Cannot enable hardware decoder as we failed to get the codec API.");
       r = -2;
       goto error;
     }
 
     /* Check if HW-accel is supported. */
-    hr = codec->IsSupported(&CODECAPI_AVDecVideoAcceleration_H264);
+    GUID hardAcc;
+    r = convert_trameleon_to_mft_hardAcc(hardAcc, settings.input_format);
+    if (0 > r) {
+      TRAD("Hardware acceleration codec unavailable.");
+      goto error;
+    }
+
+    hr = codec->IsSupported(&hardAcc);
     if (S_OK != hr) {
       TRAD("Hardware acceleration is not supported.");
       r = 0;
       goto error;
     }
 
-    hr = codec->IsModifiable(&CODECAPI_AVDecVideoAcceleration_H264);
+    hr = codec->IsModifiable(&hardAcc);
     if (S_OK != hr) {
       TRAE("Hardware acceleration cannot be modified.");
       r = 0;
@@ -1072,19 +817,20 @@ namespace tra {
 
     /* When supported ... try to set it. */
     hr = decoder_transform->GetAttributes(&attribs);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot enable hardware based decoding as we failed to get the transform attributes that we need to enable it.");
+    if (S_OK != hr) {
+      TRAE("Cannot enable hardware based decoding as we failed to get the transform attributes "
+           "that we need to enable it.");
       r = -3;
       goto error;
     }
-      
-    hr = attribs->SetUINT32(CODECAPI_AVDecVideoAcceleration_H264, TRUE);
-    if (false == SUCCEEDED(hr)) {
+
+    hr = attribs->SetUINT32(hardAcc, TRUE);
+    if (S_OK != hr) {
       TRAE("Cannot enable hardware based decoder as we failed to set the attribute.");
       r = -4;
       goto error;
     }
-    
+
   error:
 
     if (NULL != codec) {
@@ -1096,80 +842,7 @@ namespace tra {
       attribs->Release();
       attribs = NULL;
     }
-    
-    return r;
-  }
-
-  /* ------------------------------------------------------- */
-
-  int MediaFoundationDecoder::enableLowLatencyDecoding() {
-
-    IMFAttributes* attribs = NULL;
-    HRESULT hr = S_OK;
-    int r = 0;
-    
-    if (NULL == decoder_transform) {
-      TRAE("Cannot enable low latency decoding; our `decoder_transform` member is NULL. Did you call `init()`?");
-      r = -1;
-      goto error;
-    }
-    
-    hr = decoder_transform->GetAttributes(&attribs);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot enable low latency decoding; we failed to get the attributes from the transform.");
-      r = -2;
-      goto error;
-    }
-    
-    hr = attribs->SetUINT32(CODECAPI_AVLowLatencyMode, TRUE);
-    if (false == SUCCEEDED(hr)) {
-      TRAE("Cannot enable low latency decoding; we failed to change the mode.");
-      r = -3;
-      goto error;
-    }
-    
-  error:
-
-    if (NULL != attribs) {
-      attribs->Release();
-      attribs = NULL;
-    }
 
     return r;
   }
-
-  /* ------------------------------------------------------- */
-
-  /* 
-     Thanks StackOverflow :P 
-     
-     @todo I have to move this into a utils file; shared with encoder.
-        
-  */
-  static std::string get_last_error_as_string() {
-    
-    DWORD error_id = ::GetLastError();
-    if(error_id == 0) {
-      return std::string(); 
-    }
-    
-    LPSTR message_buffer = nullptr;
-    size_t size = FormatMessageA(
-      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-      NULL,
-      error_id,
-      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      (LPSTR)&message_buffer,
-      0,
-      NULL
-    );
-    
-    std::string message(message_buffer, size);
-    LocalFree(message_buffer);
-    
-    return message;
-  }
-
-  /* ------------------------------------------------------- */
-  
-}; /* namespace mo */
+} // namespace tra

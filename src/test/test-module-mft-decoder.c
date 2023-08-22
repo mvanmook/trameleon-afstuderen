@@ -36,14 +36,21 @@
 #include <tra/dict.h>
 #include <tra/log.h>
 
+
+void printaverror(int code){
+  char err[128];
+  av_strerror(code,err, sizeof(err));
+  TRAE("%s", err);
+}
 /* ------------------------------------------------------- */
 
 static int on_decoded_data(uint32_t type, void* data, void* user);
 
+
+
 /* ------------------------------------------------------- */
 
 int main(int argc, const char* argv[]) {
-
   const char* input_filename = "./test-module-mft-encoder.h264";
   AVFormatContext* fmt_ctx = NULL;
   AVPacket* pkt = NULL;
@@ -52,7 +59,7 @@ int main(int argc, const char* argv[]) {
   tra_core_settings core_cfg = { 0 };
   tra_core* core = NULL;
 
-  tra_encoded_host_memory host_mem = { 0 };
+  tra_memory_h264 host_mem = { 0 };
   tra_decoder_callbacks dec_callbacks = { 0 };
   tra_decoder_settings dec_opt = { 0 };
   tra_decoder* dec = NULL;
@@ -91,8 +98,14 @@ int main(int argc, const char* argv[]) {
 
   dec_opt.callbacks.on_decoded_data = on_decoded_data;
   dec_opt.callbacks.user = NULL;
-  dec_opt.image_width = 1280;
-  dec_opt.image_height = 720;
+  dec_opt.image_width = 3840;
+  dec_opt.image_height = 2160;
+  dec_opt.input_format = TRA_IMAGE_FORMAT_H264;
+  dec_opt.output_format = TRA_IMAGE_FORMAT_NV12;
+  dec_opt.bitrate = 700e3;
+  dec_opt.fps_den = 60;
+  dec_opt.fps_num = 1;
+
 
   r = tra_core_decoder_create(core, "mftdec", &dec_opt, NULL, &dec);
   if (r < 0) {
@@ -106,18 +119,18 @@ int main(int argc, const char* argv[]) {
 
   TRAI("Start decoding");
   
-  while (av_read_frame(fmt_ctx, pkt) >= 0) {
-        
+  while ((r = av_read_frame(fmt_ctx, pkt)) >= 0) {
     host_mem.data = pkt->data;
     host_mem.size = pkt->size;
-    
-    r = tra_decoder_decode(dec, TRA_MEMORY_TYPE_HOST_H264, &host_mem);
+
+    r = tra_decoder_decode(dec, TRA_MEMORY_TYPE_H264, &host_mem);
     if (r < 0) {
       r = -50;
       goto error;
     }
-
-    TRAD("%d", r);
+  }
+  if (AVERROR_EOF == r){
+    r = 0;
   }
   
  error:
@@ -152,39 +165,27 @@ int main(int argc, const char* argv[]) {
 /* ------------------------------------------------------- */
 
 static int on_decoded_data(uint32_t type, void* data, void* user) {
-
   char filename[128] = { 0 };
-  static uint8_t did_create_file = 0;
   static uint16_t count = 0;
   uint32_t plane_stride = 0;
   uint8_t* plane_ptr = NULL;
-  tra_image* img = NULL;
+  tra_memory_image* img = NULL;
   uint32_t half_h = 0;
-  uint32_t i = 0;
   uint32_t j = 0;
   FILE* fp = NULL;
   int r = 0;
 
-  if (TRA_MEMORY_TYPE_HOST_IMAGE != type) {
+  if (TRA_MEMORY_TYPE_IMAGE != type) {
     TRAE("Received decoded data that we can't handle. We can only handle `TRA_MEMORY_TYPE_HOST_IMAGE`.");
     r = -10;
     goto error;
   }
 
-  img = (tra_image*)data;
+  img = (tra_memory_image*)data;
   
   TRAD("Received decoded data.");
-  tra_image_print(img);
+  tra_memoryimage_print(img);
 
-  if (0 != did_create_file) {
-    r = 0;
-    goto error;
-  }
-  
-  if (count > 10) {
-    r = 0;
-    goto error;
-  }
 
   if (TRA_IMAGE_FORMAT_NV12 != img->image_format) {
     TRAE("Received decoded data, but we're not writing it to a file as we only support NV12, we received: %s", tra_imageformat_to_string(img->image_format));
@@ -195,7 +196,7 @@ static int on_decoded_data(uint32_t type, void* data, void* user) {
   r = snprintf(
     filename,
     sizeof(filename),
-    "test-module-mft-decoder-image-%s-%04u.yuv",
+    "./output/3840x2160_yuv420pUVI_%s_%d.yuv",
     tra_imageformat_to_string(img->image_format),
     count
   );
@@ -244,7 +245,6 @@ static int on_decoded_data(uint32_t type, void* data, void* user) {
     plane_ptr += plane_stride;
   }
 
-  did_create_file = 1;
   count++;
 
  error:
