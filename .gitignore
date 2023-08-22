@@ -1,5 +1,10 @@
 # roxlu
 build
+!build/deps
+!build/CMakeLists.txt
+!build/release.bat
+!build/release.sh
+!build/run.sh
 install
 
 # ---> Emacs
