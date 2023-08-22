@@ -41,7 +41,7 @@ macro(tra_add_library)
     # Make sure the lib DLL functions are exported, see api.h
     target_compile_definitions(${TRA_LIB_NAME} PRIVATE TRA_LIB_EXPORT)
 
-    # Make sure we can find the shared library 
+    # Make sure we can find the shared morph library 
     set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
     
   endif()
@@ -49,6 +49,7 @@ macro(tra_add_library)
   if (TRA_LIB_DEPS)
     add_dependencies(${TRA_LIB_NAME} ${TRA_LIB_DEPS})
   endif()
+ 
 
 endmacro(tra_add_library)
 

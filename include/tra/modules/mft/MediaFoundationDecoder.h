@@ -64,7 +64,7 @@ namespace tra {
     uint32_t image_format = 0;  /* The image format you want to use for the decoded frames. */
     uint32_t image_width = 0;   /* The width of the decoded video. */
     uint32_t image_height = 0;  /* The height of the decoded video. */
-    void* user = NULL;          /* User pointer that is passed into `on_decoded_data`. */
+    void* user;                 /* User pointer that is passed into `on_decoded_data`. */
   };
 
   /* ------------------------------------------------------- */

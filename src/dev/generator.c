@@ -401,7 +401,7 @@ static int encode_frame(dev_generator* ctx) {
     }
 
     if (AVERROR_EOF == r) {
-      TRAI("Encoder returned EOF");
+      TRAI("Encoder returned OEF");
       r = 0;
       break;
     }

@@ -60,7 +60,7 @@ static int tra_easy_encoder_create(tra_easy* ez, tra_easy_app_object** result) {
   const char* encoders[] = {
     "nvenchost",
     "nvenccuda",
-    "x264enc",
+    "x264",
     NULL
   };
 

@@ -165,7 +165,7 @@ struct tra_decoder_settings {
   tra_decoder_callbacks callbacks; /* The callbacks that get called by the decoder. */
   uint32_t image_width;            /* The width of the video frames. */
   uint32_t image_height;           /* The height of the video frames. */
-  uint32_t output_type;            /* The preferred output type which can be any of the `TRA_MEMORY_TYPE_*` types. This can be used to implement decode on device and then use the decoded on-device memory to perform a (different) encode using the on-device memory to skip a memory copy. */
+  uint32_t output_type;            /* The preferred output type which can be any of the `TRA_OUTPUT_TYPE_*` types. This can be used to implement decode on device and then use the decoded on-device memory to perform a (different) encode using the on-device memory to skip a memory copy. */
 };
 
 /* ------------------------------------------------------- */

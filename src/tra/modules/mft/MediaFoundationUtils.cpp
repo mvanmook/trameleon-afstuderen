@@ -42,7 +42,7 @@ int mft_imageformat_to_videoformat(uint32_t imageFormat, GUID* outFormat) {
     }
   }
 
-  TRAE("Unhandled image format; cannot convert into a MFT format.");
+  TRAE("Unhandled image foramt; cannot convert into a MFT format.");
   return -2;
 }
 

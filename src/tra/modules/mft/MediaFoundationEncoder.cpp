@@ -681,7 +681,7 @@ namespace tra {
       @todo As the transforms I've tested don't manage their
       buffers I haven't been able to test and fully implement
       this function. I'm leaving this here until I've got
-      something to test. maarten - lijkt veel op die hier boven
+      something to test.
 
    */
   int MediaFoundationEncoder::processOutputWithTransformBuffers() {
@@ -941,7 +941,7 @@ namespace tra {
       goto error;
     }
     
-    hr = MFSetAttributeRatio(media_type, MF_MT_FRAME_RATE, settings.fps_num, settings.fps_dem);
+    hr = MFSetAttributeRatio(media_type, MF_MT_FRAME_RATE, settings.fps_den, settings.fps_num);
     if (false == SUCCEEDED(hr)) {
       TRAE("Failed to set the frame rate on the input media type.");
       r = -90;

@@ -14,8 +14,8 @@
 
 /* ------------------------------------------------------- */
 
+static tra_easy_api easy_encoder_api;
 static tra_encoder_api encoder_api;
-static tra_easy_api easy_api;
 
 /* ------------------------------------------------------- */
 
@@ -46,7 +46,7 @@ static int encoder_flush(tra_encoder_object* obj);
 static int easy_encoder_create(tra_easy* ez, tra_encoder_settings* cfg, void** enc);
 static int easy_encoder_encode(void* enc, tra_sample* sample, uint32_t type, void* data);
 static int easy_encoder_flush(void* enc);
-static int easy_encoder_destroy(void* enc);
+ static int easy_encoder_destroy(void* enc);
 
 /* ------------------------------------------------------- */
 
@@ -680,7 +680,7 @@ int tra_load(tra_registry* reg) {
     return -20;
   }
 
-  r = tra_registry_add_easy_api(reg, &easy_api);
+  r = tra_registry_add_easy_api(reg, &easy_encoder_api);
   if (r < 0) {
     TRAE("Failed to register the `nvenchost` easy encoder.");
     return -30;
@@ -702,7 +702,7 @@ static tra_encoder_api encoder_api = {
 
 /* ------------------------------------------------------- */
 
-static tra_easy_api easy_api = {
+static tra_easy_api easy_encoder_api = {
   .get_name = encoder_get_name,
   .get_author = encoder_get_author,
   .encoder_create = easy_encoder_create,

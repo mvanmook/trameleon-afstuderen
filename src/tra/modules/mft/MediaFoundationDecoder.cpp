@@ -412,7 +412,7 @@ namespace tra {
       goto error;
     }
 
-    /* Feed the data into the decoder. @todo what if too big forr one process maarten*/
+    /* Feed the data into the decoder. */
     hr = decoder_transform->ProcessInput(stream_input_id, sample, 0);
     if (false == SUCCEEDED(hr)) {
       TRAE("Failed to process input.");
@@ -551,7 +551,8 @@ namespace tra {
 
       hr = decoder_transform->ProcessOutput(0, 1, &output_data, &status);
       if (MF_E_TRANSFORM_STREAM_CHANGE == hr) {
-        IMFTransform::GetOutputAvailableType()
+        TRAE("@todo I have to implement stream changes. (exiting)");
+        exit(EXIT_FAILURE);
       }
 
       /* This will most likely happen every 2nd loop which is ok. */
