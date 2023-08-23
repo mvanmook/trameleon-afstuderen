@@ -1,7 +1,11 @@
 # roxlu
 
-build/cmake-build-debug-event-trace
-build/cmake-build-debug
+!build/deps
+!build/CMakeLists.txt
+!build/release.bat
+!build/release.sh
+!build/run.sh
+build
 install
 
 # ---> Emacs
