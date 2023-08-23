@@ -2,23 +2,12 @@
 
 Transcoding Library for Livepeer
 
-branch: netint-additions
-Contains netint changes to allow settings to be
-set dynamically.
+this branch is the original code before this project started.
 
-branch: mft-addition-version2
-Contains bug fixes in the Media Foundation module
-and allows the user to set implemented settings.
+the branch netint-additions contains the changes made to implement the netint module
 
-branch: easyTranscoder
-An implementation of a transcoder mad of an
-encoder and decoder. This transcoder partiallly
-implements the easy transcoder.
+the branch mft-additions-version2 contains the second attempt to implement the Media Foundation module. this is the final version made in this project.
 
-branch: imageprocessing
-Contains an incomplete implementation to combine
-multiple images into one.
+the branch transcoder is based on the branch mft-additions-version2 and adds the transcoder implementation
 
-old branches:
-mft-addition-version2-alloc-fix: merged into mft-addition-version2
-mft-addition: the first attempt at mft-addition-version2
+the branch imageprocessing contains changes that implement the image processing functionalities.
