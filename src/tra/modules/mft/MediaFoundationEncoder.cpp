@@ -871,7 +871,7 @@ do{
     return r;
   }
 
-  int MediaFoundationEncoder::processData() {
+  int MediaFoundationEncoder::processSample() {
 
     HRESULT hr = S_OK;
     int r = 0;
@@ -1154,7 +1154,7 @@ do{
       goto error;
     }
 
-    hr = processData();
+    hr = processSample();
     if (S_OK != hr) {
       TRAE("failed to process data");
       r = -10;

@@ -131,7 +131,7 @@ namespace tra {
      * processes the data through the transform
      * @returns <0 if an error occurs otherwise 0
      */
-    int processData();
+    int processSample();
 
     /**
      * this function retrieves the data from the transform and calls callback in settings
